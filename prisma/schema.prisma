@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EstadoPrestamo {
+  ACTIVO
+  DEVUELTO
+  PERDIDO
+}
+
+model Facultad {
+  idFacultad     Int       @id @default(autoincrement())
+  nombreFacultad String
+
+  escuelas       Escuela[]
+}
+
+model Escuela {
+  idEscuela     Int       @id @default(autoincrement())
+  nombreEscuela String
+  idFacultad    Int
+
+  facultad      Facultad  @relation(fields: [idFacultad], references: [idFacultad])
+  estudiantes   Estudiante[]
+}
+
+model Estudiante {
+  idEstudiante     Int       @id @default(autoincrement())
+  dniEstudiante    String    @unique
+  nombreEstudiante String
+  apellidoPaterno  String
+  apellidoMaterno  String
+  idEscuela        Int
+
+  escuela          Escuela   @relation(fields: [idEscuela], references: [idEscuela])
+  prestamos        Prestamo[]
+}
+
+model Bibliotecario {
+  idBibliotecario     Int       @id @default(autoincrement())
+  nombreBibliotecario String
+  apellidoPaterno    String
+  apellidoMaterno    String
+
+  prestamos           Prestamo[]
+}
+
+model Area {
+  idArea     Int       @id @default(autoincrement())
+  nombreArea String
+
+  libros     Libro[]
+}
+
+model Editorial {
+  idEditorial     Int       @id @default(autoincrement())
+  nombreEditorial String
+
+  libros          Libro[]
+}
+
+model Autor {
+  idAutor          Int       @id @default(autoincrement())
+  nombreAutor      String
+  apellidoPaterno String
+  apellidoMaterno String
+  ORCID            String?   @unique
+
+  libros           LibroAutor[]
+}
+
+model Libro {
+  codigoLibro Int       @id @default(autoincrement())
+  nombreLibro String
+  idArea      Int
+  idEditorial Int
+
+  area        Area      @relation(fields: [idArea], references: [idArea])
+  editorial   Editorial @relation(fields: [idEditorial], references: [idEditorial])
+  autores     LibroAutor[]
+  ejemplares  Ejemplar[]
+}
+
+model LibroAutor {
+  id          Int       @id @default(autoincrement())
+  codigoLibro Int
+  idAutor     Int
+
+  libro       Libro     @relation(fields: [codigoLibro], references: [codigoLibro])
+  autor       Autor     @relation(fields: [idAutor], references: [idAutor])
+
+  @@unique([codigoLibro, idAutor])
+}
+
+model Ejemplar {
+  idEjemplar  Int       @id @default(autoincrement())
+  codigoLibro Int
+
+  libro       Libro     @relation(fields: [codigoLibro], references: [codigoLibro])
+  prestamos   Prestamo[]
+}
+
+model Prestamo {
+  idPrestamo        Int            @id @default(autoincrement())
+  idEstudiante      Int
+  idBibliotecario   Int
+  idEjemplar        Int
+  fechaPrestamo     DateTime       @default(now())
+  fechaDevolucion   DateTime?
+  estadoPrestamo    EstadoPrestamo
+
+  estudiante        Estudiante     @relation(fields: [idEstudiante], references: [idEstudiante])
+  bibliotecario     Bibliotecario  @relation(fields: [idBibliotecario], references: [idBibliotecario])
+  ejemplar          Ejemplar       @relation(fields: [idEjemplar], references: [idEjemplar])
+}
