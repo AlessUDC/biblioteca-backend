@@ -14,27 +14,12 @@ export class AutorService {
     }
 
     findAll() {
-        return this.prisma.autor.findMany({
-            include: {
-                libros: {
-                    include: {
-                        libro: true,
-                    },
-                },
-            },
-        });
+        return this.prisma.autor.findMany();
     }
 
     findOne(id: number) {
         return this.prisma.autor.findUnique({
             where: { idAutor: id },
-            include: {
-                libros: {
-                    include: {
-                        libro: true,
-                    },
-                },
-            },
         });
     }
 

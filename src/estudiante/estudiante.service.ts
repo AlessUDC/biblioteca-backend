@@ -16,12 +16,7 @@ export class EstudianteService {
     findAll() {
         return this.prisma.estudiante.findMany({
             include: {
-                escuela: {
-                    include: {
-                        facultad: true,
-                    },
-                },
-                prestamos: true,
+                escuela: true,
             },
         });
     }
@@ -30,12 +25,7 @@ export class EstudianteService {
         return this.prisma.estudiante.findUnique({
             where: { idEstudiante: id },
             include: {
-                escuela: {
-                    include: {
-                        facultad: true,
-                    },
-                },
-                prestamos: true,
+                escuela: true,
             },
         });
     }

@@ -1,8 +1,9 @@
-import { IsString, IsNotEmpty, IsInt } from 'class-validator';
+import { IsString, IsNotEmpty, IsInt, IsArray, ArrayMinSize, MinLength } from 'class-validator';
 
 export class CreateLibroDto {
     @IsString()
     @IsNotEmpty()
+    @MinLength(2)
     nombreLibro: string;
 
     @IsInt()
@@ -10,4 +11,9 @@ export class CreateLibroDto {
 
     @IsInt()
     idEditorial: number;
+
+    @IsArray()
+    @ArrayMinSize(1)
+    @IsInt({ each: true })
+    autoresIds: number[];
 }

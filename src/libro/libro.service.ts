@@ -8,8 +8,23 @@ export class LibroService {
     constructor(private prisma: PrismaService) { }
 
     create(createLibroDto: CreateLibroDto) {
+        const { autoresIds, ...libroData } = createLibroDto;
         return this.prisma.libro.create({
-            data: createLibroDto,
+            data: {
+                ...libroData,
+                autores: {
+                    create: autoresIds.map((id) => ({
+                        autor: { connect: { idAutor: id } },
+                    })),
+                },
+            },
+            include: {
+                autores: {
+                    include: {
+                        autor: true,
+                    },
+                },
+            }
         });
     }
 
@@ -23,7 +38,6 @@ export class LibroService {
                         autor: true,
                     },
                 },
-                ejemplares: true,
             },
         });
     }
@@ -39,7 +53,6 @@ export class LibroService {
                         autor: true,
                     },
                 },
-                ejemplares: true,
             },
         });
     }

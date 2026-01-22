@@ -1,5 +1,4 @@
-import { IsInt, IsEnum, IsOptional, IsDateString } from 'class-validator';
-import { EstadoPrestamo } from '@prisma/client';
+import { IsInt } from 'class-validator';
 
 export class CreatePrestamoDto {
     @IsInt()
@@ -10,11 +9,4 @@ export class CreatePrestamoDto {
 
     @IsInt()
     idEjemplar: number;
-
-    @IsEnum(EstadoPrestamo)
-    estadoPrestamo: EstadoPrestamo;
-
-    @IsOptional()
-    @IsDateString()
-    fechaDevolucion?: string;
 }

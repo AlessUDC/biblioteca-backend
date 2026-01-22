@@ -27,7 +27,6 @@ export class EjemplarService {
                         },
                     },
                 },
-                prestamos: true,
             },
         });
     }
@@ -47,7 +46,6 @@ export class EjemplarService {
                         },
                     },
                 },
-                prestamos: true,
             },
         });
     }

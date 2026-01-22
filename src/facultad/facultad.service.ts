@@ -14,19 +14,12 @@ export class FacultadService {
     }
 
     findAll() {
-        return this.prisma.facultad.findMany({
-            include: {
-                escuelas: true,
-            },
-        });
+        return this.prisma.facultad.findMany();
     }
 
     findOne(id: number) {
         return this.prisma.facultad.findUnique({
             where: { idFacultad: id },
-            include: {
-                escuelas: true,
-            },
         });
     }
 

@@ -14,19 +14,12 @@ export class EditorialService {
     }
 
     findAll() {
-        return this.prisma.editorial.findMany({
-            include: {
-                libros: true,
-            },
-        });
+        return this.prisma.editorial.findMany();
     }
 
     findOne(id: number) {
         return this.prisma.editorial.findUnique({
             where: { idEditorial: id },
-            include: {
-                libros: true,
-            },
         });
     }
 

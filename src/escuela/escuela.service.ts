@@ -17,7 +17,6 @@ export class EscuelaService {
         return this.prisma.escuela.findMany({
             include: {
                 facultad: true,
-                estudiantes: true,
             },
         });
     }
@@ -27,7 +26,6 @@ export class EscuelaService {
             where: { idEscuela: id },
             include: {
                 facultad: true,
-                estudiantes: true,
             },
         });
     }

@@ -14,19 +14,12 @@ export class BibliotecarioService {
     }
 
     findAll() {
-        return this.prisma.bibliotecario.findMany({
-            include: {
-                prestamos: true,
-            },
-        });
+        return this.prisma.bibliotecario.findMany();
     }
 
     findOne(id: number) {
         return this.prisma.bibliotecario.findUnique({
             where: { idBibliotecario: id },
-            include: {
-                prestamos: true,
-            },
         });
     }
 

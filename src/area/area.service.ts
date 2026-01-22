@@ -14,19 +14,12 @@ export class AreaService {
     }
 
     findAll() {
-        return this.prisma.area.findMany({
-            include: {
-                libros: true,
-            },
-        });
+        return this.prisma.area.findMany();
     }
 
     findOne(id: number) {
         return this.prisma.area.findUnique({
             where: { idArea: id },
-            include: {
-                libros: true,
-            },
         });
     }
 
