@@ -1,4 +1,4 @@
-import { IsInt } from 'class-validator';
+import { IsInt, IsOptional, IsDateString } from 'class-validator';
 
 export class CreatePrestamoDto {
     @IsInt()
@@ -9,4 +9,11 @@ export class CreatePrestamoDto {
 
     @IsInt()
     idEjemplar: number;
+
+    @IsOptional()
+    @IsDateString()
+    fechaDevolucion?: string;
+
+    @IsDateString()
+    fechaLimite: string;
 }

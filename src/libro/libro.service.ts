@@ -57,14 +57,56 @@ export class LibroService {
         });
     }
 
-    update(id: number, updateLibroDto: UpdateLibroDto) {
+    async update(id: number, updateLibroDto: UpdateLibroDto) {
+        const { autoresIds, ...libroData } = updateLibroDto;
+
+        // If autoresIds is provided, we clear existing associations and create new ones
+        if (autoresIds) {
+            await this.prisma.libroAutor.deleteMany({
+                where: { idLibro: id },
+            });
+
+            return this.prisma.libro.update({
+                where: { codigoLibro: id },
+                data: {
+                    ...libroData,
+                    autores: {
+                        create: autoresIds.map((idAutor) => ({
+                            autor: { connect: { idAutor } },
+                        })),
+                    },
+                },
+                include: {
+                    area: true,
+                    editorial: true,
+                    autores: {
+                        include: {
+                            autor: true,
+                        },
+                    },
+                },
+            });
+        }
+
         return this.prisma.libro.update({
             where: { codigoLibro: id },
-            data: updateLibroDto,
+            data: libroData as any,
+            include: {
+                area: true,
+                editorial: true,
+                autores: {
+                    include: {
+                        autor: true,
+                    },
+                },
+            },
         });
     }
 
-    remove(id: number) {
+    async remove(id: number) {
+        await this.prisma.libroAutor.deleteMany({
+            where: { idLibro: id },
+        });
         return this.prisma.libro.delete({
             where: { codigoLibro: id },
         });

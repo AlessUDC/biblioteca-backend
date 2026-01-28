@@ -13,6 +13,14 @@ enum EstadoPrestamo {
   PERDIDO
 }
 
+enum EstadoEjemplar {
+  DISPONIBLE
+  PRESTADO
+  REPARACION
+  PERDIDO
+  NO_DISPONIBLE
+}
+
 model Facultad {
   idFacultad     Int       @id @default(autoincrement())
   nombreFacultad String
@@ -36,6 +44,8 @@ model Estudiante {
   apellidoPaterno  String
   apellidoMaterno  String
   idEscuela        Int
+  activo           Boolean   @default(true)
+  sanciones        Int       @default(0)
 
   escuela          Escuela   @relation(fields: [idEscuela], references: [idEscuela])
   prestamos        Prestamo[]
@@ -66,9 +76,10 @@ model Editorial {
 
 model Autor {
   idAutor          Int       @id @default(autoincrement())
-  nombreAutor      String
-  apellidoPaterno String
-  apellidoMaterno String
+  nombreAutor      String?
+  apellidoPaterno  String?
+  apellidoMaterno  String?
+  nacionalidad     String?
   ORCID            String?   @unique
 
   libros           LibroAutor[]
@@ -87,22 +98,25 @@ model Libro {
 }
 
 model LibroAutor {
-  id          Int       @id @default(autoincrement())
-  codigoLibro Int
-  idAutor     Int
+  idLibro Int
+  idAutor Int
 
-  libro       Libro     @relation(fields: [codigoLibro], references: [codigoLibro])
+  libro       Libro     @relation(fields: [idLibro], references: [codigoLibro])
   autor       Autor     @relation(fields: [idAutor], references: [idAutor])
 
-  @@unique([codigoLibro, idAutor])
+  @@id([idLibro, idAutor])
 }
 
 model Ejemplar {
-  idEjemplar  Int       @id @default(autoincrement())
-  codigoLibro Int
+  idEjemplar         Int            @id @default(autoincrement())
+  codigoLibro        Int            @unique
+  ubicacion          String
+  cantidadTotal      Int            @default(1)
+  cantidadDisponible Int            @default(1)
+  estado             EstadoEjemplar @default(DISPONIBLE)
 
-  libro       Libro     @relation(fields: [codigoLibro], references: [codigoLibro])
-  prestamos   Prestamo[]
+  libro     Libro      @relation(fields: [codigoLibro], references: [codigoLibro])
+  prestamos Prestamo[]
 }
 
 model Prestamo {
@@ -111,6 +125,7 @@ model Prestamo {
   idBibliotecario   Int
   idEjemplar        Int
   fechaPrestamo     DateTime       @default(now())
+  fechaLimite       DateTime       // Fecha máxima de devolución (Deadline)
   fechaDevolucion   DateTime?
   estadoPrestamo    EstadoPrestamo
 
