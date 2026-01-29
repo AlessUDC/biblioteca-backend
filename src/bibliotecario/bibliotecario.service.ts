@@ -19,20 +19,20 @@ export class BibliotecarioService {
 
     findOne(id: number) {
         return this.prisma.bibliotecario.findUnique({
-            where: { idBibliotecario: id },
+            where: { bibliotecarioId: id },
         });
     }
 
     update(id: number, updateBibliotecarioDto: UpdateBibliotecarioDto) {
         return this.prisma.bibliotecario.update({
-            where: { idBibliotecario: id },
+            where: { bibliotecarioId: id },
             data: updateBibliotecarioDto,
         });
     }
 
     remove(id: number) {
         return this.prisma.bibliotecario.delete({
-            where: { idBibliotecario: id },
+            where: { bibliotecarioId: id },
         });
     }
 }

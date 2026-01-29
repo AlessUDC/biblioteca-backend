@@ -21,7 +21,7 @@ export class EjemplarService {
         if (existing) {
             // Increment logic
             return this.prisma.ejemplar.update({
-                where: { idEjemplar: existing.idEjemplar },
+                where: { ejemplarId: existing.ejemplarId },
                 data: {
                     cantidadTotal: { increment: incrementAmount },
                     cantidadDisponible: { increment: incrementAmount },
@@ -54,7 +54,7 @@ export class EjemplarService {
             include: {
                 libro: {
                     include: {
-                        area: true,
+                        categoria: true,
                         editorial: true,
                         autores: {
                             include: {
@@ -69,11 +69,11 @@ export class EjemplarService {
 
     findOne(id: number) {
         return this.prisma.ejemplar.findUnique({
-            where: { idEjemplar: id },
+            where: { ejemplarId: id },
             include: {
                 libro: {
                     include: {
-                        area: true,
+                        categoria: true,
                         editorial: true,
                         autores: {
                             include: {
@@ -89,7 +89,7 @@ export class EjemplarService {
     async update(id: number, updateEjemplarDto: UpdateEjemplarDto) {
         return this.prisma.$transaction(async (tx) => {
             const existing = await tx.ejemplar.findUnique({
-                where: { idEjemplar: id },
+                where: { ejemplarId: id },
             });
 
             if (!existing) {
@@ -99,7 +99,7 @@ export class EjemplarService {
             // 1. Count active loans
             const activeLoans = await tx.prestamo.count({
                 where: {
-                    idEjemplar: id,
+                    ejemplarId: id,
                     estadoPrestamo: EstadoPrestamo.ACTIVO,
                 },
             });
@@ -148,7 +148,7 @@ export class EjemplarService {
             }
 
             return tx.ejemplar.update({
-                where: { idEjemplar: id },
+                where: { ejemplarId: id },
                 data,
             });
         });
@@ -157,7 +157,7 @@ export class EjemplarService {
     async remove(id: number) {
         return this.prisma.$transaction(async (tx) => {
             const existing = await tx.ejemplar.findUnique({
-                where: { idEjemplar: id },
+                where: { ejemplarId: id },
             });
 
             if (!existing) {
@@ -176,7 +176,7 @@ export class EjemplarService {
                 const newCantidadDisponible = existing.cantidadDisponible - 1;
 
                 return tx.ejemplar.update({
-                    where: { idEjemplar: id },
+                    where: { ejemplarId: id },
                     data: {
                         cantidadTotal: { decrement: 1 },
                         cantidadDisponible: newCantidadDisponible,
@@ -193,7 +193,7 @@ export class EjemplarService {
             }
 
             return tx.ejemplar.delete({
-                where: { idEjemplar: id },
+                where: { ejemplarId: id },
             });
         });
     }

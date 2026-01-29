@@ -19,20 +19,20 @@ export class EditorialService {
 
     findOne(id: number) {
         return this.prisma.editorial.findUnique({
-            where: { idEditorial: id },
+            where: { editorialId: id },
         });
     }
 
     update(id: number, updateEditorialDto: UpdateEditorialDto) {
         return this.prisma.editorial.update({
-            where: { idEditorial: id },
+            where: { editorialId: id },
             data: updateEditorialDto,
         });
     }
 
     remove(id: number) {
         return this.prisma.editorial.delete({
-            where: { idEditorial: id },
+            where: { editorialId: id },
         });
     }
 }

@@ -3,13 +3,17 @@ import { IsString, IsNotEmpty, IsInt, MinLength } from 'class-validator';
 export class CreateEstudianteDto {
     @IsString()
     @IsNotEmpty()
+    tipoDocumento: string;
+
+    @IsString()
+    @IsNotEmpty()
     @MinLength(8) // Assuming DNI is at least 8 chars
-    dniEstudiante: string;
+    numeroDocumento: string;
 
     @IsString()
     @IsNotEmpty()
     @MinLength(2)
-    nombreEstudiante: string;
+    nombre: string;
 
     @IsString()
     @IsNotEmpty()
@@ -22,5 +26,5 @@ export class CreateEstudianteDto {
     apellidoMaterno: string;
 
     @IsInt()
-    idEscuela: number;
+    escuelaId: number;
 }

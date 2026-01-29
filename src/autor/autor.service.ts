@@ -19,20 +19,20 @@ export class AutorService {
 
     findOne(id: number) {
         return this.prisma.autor.findUnique({
-            where: { idAutor: id },
+            where: { autorId: id },
         });
     }
 
     update(id: number, updateAutorDto: UpdateAutorDto) {
         return this.prisma.autor.update({
-            where: { idAutor: id },
+            where: { autorId: id },
             data: updateAutorDto,
         });
     }
 
     remove(id: number) {
         return this.prisma.autor.delete({
-            where: { idAutor: id },
+            where: { autorId: id },
         });
     }
 }

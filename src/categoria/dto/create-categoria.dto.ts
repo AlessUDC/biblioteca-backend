@@ -1,8 +1,8 @@
 import { IsString, IsNotEmpty, MinLength } from 'class-validator';
 
-export class CreateAreaDto {
+export class CreateCategoriaDto {
     @IsString()
     @IsNotEmpty()
     @MinLength(3)
-    nombreArea: string;
+    nombre: string;
 }

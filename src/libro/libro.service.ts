@@ -14,7 +14,7 @@ export class LibroService {
                 ...libroData,
                 autores: {
                     create: autoresIds.map((id) => ({
-                        autor: { connect: { idAutor: id } },
+                        autor: { connect: { autorId: id } },
                     })),
                 },
             },
@@ -31,7 +31,7 @@ export class LibroService {
     findAll() {
         return this.prisma.libro.findMany({
             include: {
-                area: true,
+                categoria: true,
                 editorial: true,
                 autores: {
                     include: {
@@ -46,7 +46,7 @@ export class LibroService {
         return this.prisma.libro.findUnique({
             where: { codigoLibro: id },
             include: {
-                area: true,
+                categoria: true,
                 editorial: true,
                 autores: {
                     include: {
@@ -63,7 +63,7 @@ export class LibroService {
         // If autoresIds is provided, we clear existing associations and create new ones
         if (autoresIds) {
             await this.prisma.libroAutor.deleteMany({
-                where: { idLibro: id },
+                where: { libroId: id },
             });
 
             return this.prisma.libro.update({
@@ -71,13 +71,13 @@ export class LibroService {
                 data: {
                     ...libroData,
                     autores: {
-                        create: autoresIds.map((idAutor) => ({
-                            autor: { connect: { idAutor } },
+                        create: autoresIds.map((autorId) => ({
+                            autor: { connect: { autorId } },
                         })),
                     },
                 },
                 include: {
-                    area: true,
+                    categoria: true,
                     editorial: true,
                     autores: {
                         include: {
@@ -92,7 +92,7 @@ export class LibroService {
             where: { codigoLibro: id },
             data: libroData as any,
             include: {
-                area: true,
+                categoria: true,
                 editorial: true,
                 autores: {
                     include: {
@@ -105,7 +105,7 @@ export class LibroService {
 
     async remove(id: number) {
         await this.prisma.libroAutor.deleteMany({
-            where: { idLibro: id },
+            where: { libroId: id },
         });
         return this.prisma.libro.delete({
             where: { codigoLibro: id },

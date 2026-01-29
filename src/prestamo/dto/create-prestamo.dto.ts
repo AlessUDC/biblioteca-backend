@@ -2,13 +2,13 @@ import { IsInt, IsOptional, IsDateString } from 'class-validator';
 
 export class CreatePrestamoDto {
     @IsInt()
-    idEstudiante: number;
+    estudianteId: number;
 
     @IsInt()
-    idBibliotecario: number;
+    bibliotecarioId: number;
 
     @IsInt()
-    idEjemplar: number;
+    ejemplarId: number;
 
     @IsOptional()
     @IsDateString()

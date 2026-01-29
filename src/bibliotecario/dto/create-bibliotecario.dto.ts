@@ -4,7 +4,7 @@ export class CreateBibliotecarioDto {
     @IsString()
     @IsNotEmpty()
     @MinLength(2)
-    nombreBibliotecario: string;
+    nombre: string;
 
     @IsString()
     @IsNotEmpty()

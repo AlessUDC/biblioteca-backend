@@ -4,5 +4,5 @@ export class CreateFacultadDto {
     @IsString()
     @IsNotEmpty()
     @MinLength(3)
-    nombreFacultad: string;
+    nombre: string;
 }

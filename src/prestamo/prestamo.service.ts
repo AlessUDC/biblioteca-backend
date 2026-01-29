@@ -14,7 +14,7 @@ export class PrestamoService {
         return this.prisma.$transaction(async (tx) => {
             // 1. Check Student
             const estudiante = await tx.estudiante.findUnique({
-                where: { idEstudiante: createPrestamoDto.idEstudiante },
+                where: { estudianteId: createPrestamoDto.estudianteId },
             });
 
             if (!estudiante) throw new NotFoundException('Estudiante no encontrado');
@@ -27,7 +27,7 @@ export class PrestamoService {
             // 2. Check student's current active loans
             const activeLoans = await tx.prestamo.findMany({
                 where: {
-                    idEstudiante: createPrestamoDto.idEstudiante,
+                    estudianteId: createPrestamoDto.estudianteId,
                     estadoPrestamo: EstadoPrestamo.ACTIVO,
                 },
             });
@@ -47,7 +47,7 @@ export class PrestamoService {
             if (overdueLoansCount >= 3) {
                 // Deactivate student as penalty
                 await tx.estudiante.update({
-                    where: { idEstudiante: createPrestamoDto.idEstudiante },
+                    where: { estudianteId: createPrestamoDto.estudianteId },
                     data: { activo: false },
                 });
                 throw new ConflictException(
@@ -59,7 +59,7 @@ export class PrestamoService {
             // We use raw query to enforce database-level lock on the row
             const ejemplares = await tx.$queryRaw<any[]>`
                 SELECT * FROM "Ejemplar" 
-                WHERE "idEjemplar" = ${createPrestamoDto.idEjemplar} 
+                WHERE "ejemplarId" = ${createPrestamoDto.ejemplarId} 
                 FOR UPDATE
             `;
 
@@ -100,7 +100,7 @@ export class PrestamoService {
             // Update Stock: Decrement cantidadDisponible
             const newDisponible = ejemplar.cantidadDisponible - 1;
             await tx.ejemplar.update({
-                where: { idEjemplar: createPrestamoDto.idEjemplar },
+                where: { ejemplarId: createPrestamoDto.ejemplarId },
                 data: {
                     cantidadDisponible: newDisponible,
                     estado: newDisponible === 0 ? EstadoEjemplar.PRESTADO : EstadoEjemplar.DISPONIBLE,
@@ -113,9 +113,9 @@ export class PrestamoService {
                     fechaPrestamo: now,
                     fechaLimite: fechaLimite,
                     fechaDevolucion: fechaDevolucion,
-                    estudiante: { connect: { idEstudiante: createPrestamoDto.idEstudiante } },
-                    bibliotecario: { connect: { idBibliotecario: createPrestamoDto.idBibliotecario } },
-                    ejemplar: { connect: { idEjemplar: createPrestamoDto.idEjemplar } },
+                    estudiante: { connect: { estudianteId: createPrestamoDto.estudianteId } },
+                    bibliotecario: { connect: { bibliotecarioId: createPrestamoDto.bibliotecarioId } },
+                    ejemplar: { connect: { ejemplarId: createPrestamoDto.ejemplarId } },
                 },
             });
         });
@@ -137,7 +137,7 @@ export class PrestamoService {
 
     findOne(id: number) {
         return this.prisma.prestamo.findUnique({
-            where: { idPrestamo: id },
+            where: { prestamoId: id },
             include: {
                 estudiante: true,
                 bibliotecario: true,
@@ -153,7 +153,7 @@ export class PrestamoService {
     async update(id: number, updatePrestamoDto: UpdatePrestamoDto) {
         return this.prisma.$transaction(async (tx) => {
             const prestamo = await tx.prestamo.findUnique({
-                where: { idPrestamo: id },
+                where: { prestamoId: id },
             });
 
             if (!prestamo) {
@@ -184,7 +184,7 @@ export class PrestamoService {
             // Handle Side Effects on Stock and Student if status changes
             if (nextEstado && nextEstado !== prevEstado) {
                 const ejemplar = await tx.ejemplar.findUnique({
-                    where: { idEjemplar: prestamo.idEjemplar },
+                    where: { ejemplarId: prestamo.ejemplarId },
                 });
 
                 if (!ejemplar) throw new NotFoundException('Ejemplar no encontrado');
@@ -195,7 +195,7 @@ export class PrestamoService {
                         // RETURNED: Increment stock
                         const newDisponible = ejemplar.cantidadDisponible + 1;
                         await tx.ejemplar.update({
-                            where: { idEjemplar: ejemplar.idEjemplar },
+                            where: { ejemplarId: ejemplar.ejemplarId },
                             data: {
                                 cantidadDisponible: newDisponible,
                                 estado: EstadoEjemplar.DISPONIBLE,
@@ -208,14 +208,14 @@ export class PrestamoService {
                         if (prestamo.fechaLimite && fechaRetorno > prestamo.fechaLimite) {
                             // Increment persistent sanctions
                             const estudianteUpdated = await tx.estudiante.update({
-                                where: { idEstudiante: prestamo.idEstudiante },
+                                where: { estudianteId: prestamo.estudianteId },
                                 data: { sanciones: { increment: 1 } },
                             });
 
                             // Apply penalty threshold
                             if (estudianteUpdated.sanciones >= 3) {
                                 await tx.estudiante.update({
-                                    where: { idEstudiante: prestamo.idEstudiante },
+                                    where: { estudianteId: prestamo.estudianteId },
                                     data: { activo: false },
                                 });
                             }
@@ -223,7 +223,7 @@ export class PrestamoService {
                     } else if (nextEstado === EstadoPrestamo.PERDIDO) {
                         // LOST: Decrement total quantity, de-activate student
                         await tx.ejemplar.update({
-                            where: { idEjemplar: ejemplar.idEjemplar },
+                            where: { ejemplarId: ejemplar.ejemplarId },
                             data: {
                                 cantidadTotal: { decrement: 1 },
                                 // If disponible was 0, it might still be 0, but total is less.
@@ -232,7 +232,7 @@ export class PrestamoService {
                         });
 
                         await tx.estudiante.update({
-                            where: { idEstudiante: prestamo.idEstudiante },
+                            where: { estudianteId: prestamo.estudianteId },
                             data: { activo: false },
                         });
                     }
@@ -245,7 +245,7 @@ export class PrestamoService {
                     }
                     const newDisponible = ejemplar.cantidadDisponible - 1;
                     await tx.ejemplar.update({
-                        where: { idEjemplar: ejemplar.idEjemplar },
+                        where: { ejemplarId: ejemplar.ejemplarId },
                         data: {
                             cantidadDisponible: newDisponible,
                             estado: newDisponible === 0 ? EstadoEjemplar.NO_DISPONIBLE : EstadoEjemplar.DISPONIBLE,
@@ -257,7 +257,7 @@ export class PrestamoService {
                     // but let's handle the total count restore if it was PERDIDO
                     if (prevEstado === EstadoPrestamo.PERDIDO) {
                         await tx.ejemplar.update({
-                            where: { idEjemplar: ejemplar.idEjemplar },
+                            where: { ejemplarId: ejemplar.ejemplarId },
                             data: { cantidadTotal: { increment: 1 } },
                         });
                         // Note: Not auto-activating student because we don't know why they were deactivated.
@@ -266,7 +266,7 @@ export class PrestamoService {
             }
 
             return tx.prestamo.update({
-                where: { idPrestamo: id },
+                where: { prestamoId: id },
                 data,
             });
         });

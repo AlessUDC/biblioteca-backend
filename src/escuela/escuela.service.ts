@@ -23,7 +23,7 @@ export class EscuelaService {
 
     findOne(id: number) {
         return this.prisma.escuela.findUnique({
-            where: { idEscuela: id },
+            where: { escuelaId: id },
             include: {
                 facultad: true,
             },
@@ -32,14 +32,14 @@ export class EscuelaService {
 
     update(id: number, updateEscuelaDto: UpdateEscuelaDto) {
         return this.prisma.escuela.update({
-            where: { idEscuela: id },
+            where: { escuelaId: id },
             data: updateEscuelaDto,
         });
     }
 
     remove(id: number) {
         return this.prisma.escuela.delete({
-            where: { idEscuela: id },
+            where: { escuelaId: id },
         });
     }
 }

@@ -4,5 +4,5 @@ export class CreateEditorialDto {
     @IsString()
     @IsNotEmpty()
     @MinLength(2)
-    nombreEditorial: string;
+    nombre: string;
 }

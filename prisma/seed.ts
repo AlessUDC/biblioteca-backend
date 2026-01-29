@@ -14,13 +14,13 @@ async function main() {
 
   // --- 1. Facultades (7) ---
   const facultades: Prisma.FacultadCreateInput[] = [
-    { nombreFacultad: 'Ingeniería' },
-    { nombreFacultad: 'Ciencias de la Salud' },
-    { nombreFacultad: 'Derecho y Ciencias Políticas' },
-    { nombreFacultad: 'Ciencias Empresariales' },
-    { nombreFacultad: 'Arquitectura y Diseño' },
-    { nombreFacultad: 'Humanidades y Artes' },
-    { nombreFacultad: 'Ciencias Sociales' },
+    { nombre: 'Ingeniería' },
+    { nombre: 'Ciencias de la Salud' },
+    { nombre: 'Derecho y Ciencias Políticas' },
+    { nombre: 'Ciencias Empresariales' },
+    { nombre: 'Arquitectura y Diseño' },
+    { nombre: 'Humanidades y Artes' },
+    { nombre: 'Ciencias Sociales' },
   ];
 
   console.log('Seeding Facultades...');
@@ -30,34 +30,34 @@ async function main() {
 
   // --- 2. Escuelas (7) ---
   const escuelas = [
-    { nombreEscuela: 'Ingeniería de Sistemas', idFacultad: 1 },
-    { nombreEscuela: 'Ingeniería de Minas', idFacultad: 1 },
-    { nombreEscuela: 'Medicina Humana', idFacultad: 2 },
-    { nombreEscuela: 'Derecho', idFacultad: 3 },
-    { nombreEscuela: 'Contabilidad', idFacultad: 4 },
-    { nombreEscuela: 'Gastronomía', idFacultad: 5 },
-    { nombreEscuela: 'Psicología', idFacultad: 6 },
+    { nombre: 'Ingeniería de Sistemas', facultadId: 1 },
+    { nombre: 'Ingeniería de Minas', facultadId: 1 },
+    { nombre: 'Medicina Humana', facultadId: 2 },
+    { nombre: 'Derecho', facultadId: 3 },
+    { nombre: 'Contabilidad', facultadId: 4 },
+    { nombre: 'Gastronomía', facultadId: 5 },
+    { nombre: 'Psicología', facultadId: 6 },
   ];
 
   console.log('Seeding Escuelas...');
   for (const data of escuelas) {
     await prisma.escuela.create({
       data: {
-        nombreEscuela: data.nombreEscuela,
-        facultad: { connect: { idFacultad: data.idFacultad } }
+        nombre: data.nombre,
+        facultad: { connect: { facultadId: data.facultadId } }
       }
     });
   }
 
   // --- 3. Bibliotecarios (7) ---
   const bibliotecarios: Prisma.BibliotecarioCreateInput[] = [
-    { nombreBibliotecario: 'Juan', apellidoPaterno: 'Pérez', apellidoMaterno: 'Gómez' },
-    { nombreBibliotecario: 'María', apellidoPaterno: 'López', apellidoMaterno: 'Díaz' },
-    { nombreBibliotecario: 'Carlos', apellidoPaterno: 'Ruiz', apellidoMaterno: 'Fernández' },
-    { nombreBibliotecario: 'Ana', apellidoPaterno: 'Torres', apellidoMaterno: 'Vargas' },
-    { nombreBibliotecario: 'Luis', apellidoPaterno: 'Mendoza', apellidoMaterno: 'Rojas' },
-    { nombreBibliotecario: 'Elena', apellidoPaterno: 'Castro', apellidoMaterno: 'Silva' },
-    { nombreBibliotecario: 'Roberto', apellidoPaterno: 'Morales', apellidoMaterno: 'Soto' },
+    { nombre: 'Juan', apellidoPaterno: 'Pérez', apellidoMaterno: 'Gómez' },
+    { nombre: 'María', apellidoPaterno: 'López', apellidoMaterno: 'Díaz' },
+    { nombre: 'Carlos', apellidoPaterno: 'Ruiz', apellidoMaterno: 'Fernández' },
+    { nombre: 'Ana', apellidoPaterno: 'Torres', apellidoMaterno: 'Vargas' },
+    { nombre: 'Luis', apellidoPaterno: 'Mendoza', apellidoMaterno: 'Rojas' },
+    { nombre: 'Elena', apellidoPaterno: 'Castro', apellidoMaterno: 'Silva' },
+    { nombre: 'Roberto', apellidoPaterno: 'Morales', apellidoMaterno: 'Soto' },
   ];
 
   console.log('Seeding Bibliotecarios...');
@@ -65,31 +65,31 @@ async function main() {
     await prisma.bibliotecario.create({ data });
   }
 
-  // --- 4. Áreas (7) ---
-  const areas: Prisma.AreaCreateInput[] = [
-    { nombreArea: 'Informática' },
-    { nombreArea: 'Literatura' },
-    { nombreArea: 'Historia' },
-    { nombreArea: 'Ciencias Puras' },
-    { nombreArea: 'Filosofía' },
-    { nombreArea: 'Arte' },
-    { nombreArea: 'Matemáticas' },
+  // --- 4. Categorias (ex Areas) (7) ---
+  const categorias: Prisma.CategoriaCreateInput[] = [
+    { nombre: 'Informática' },
+    { nombre: 'Literatura' },
+    { nombre: 'Historia' },
+    { nombre: 'Ciencias Puras' },
+    { nombre: 'Filosofía' },
+    { nombre: 'Arte' },
+    { nombre: 'Matemáticas' },
   ];
 
-  console.log('Seeding Areas...');
-  for (const data of areas) {
-    await prisma.area.create({ data });
+  console.log('Seeding Categorias...');
+  for (const data of categorias) {
+    await prisma.categoria.create({ data });
   }
 
   // --- 5. Editoriales (7) ---
   const editoriales: Prisma.EditorialCreateInput[] = [
-    { nombreEditorial: 'Planeta' },
-    { nombreEditorial: 'Alfaguara' },
-    { nombreEditorial: 'Penguin Random House' },
-    { nombreEditorial: 'McGraw-Hill' },
-    { nombreEditorial: 'Pearson' },
-    { nombreEditorial: 'Anagrama' },
-    { nombreEditorial: 'Fondo de Cultura Económica' },
+    { nombre: 'Planeta' },
+    { nombre: 'Alfaguara' },
+    { nombre: 'Penguin Random House' },
+    { nombre: 'McGraw-Hill' },
+    { nombre: 'Pearson' },
+    { nombre: 'Anagrama' },
+    { nombre: 'Fondo de Cultura Económica' },
   ];
 
   console.log('Seeding Editoriales...');
@@ -99,14 +99,14 @@ async function main() {
 
   // --- 6. Autores (7) ---
   const autores: Prisma.AutorCreateInput[] = [
-    { nombreAutor: 'Gabriel', apellidoPaterno: 'García', apellidoMaterno: 'Márquez', ORCID: '0000-0001-1111-1111', nacionalidad: 'Colombiana' },
-    { nombreAutor: 'Isabel', apellidoPaterno: 'Allende', apellidoMaterno: 'Llona', ORCID: '0000-0002-2222-2222', nacionalidad: 'Chilena' },
-    { nombreAutor: 'Jorge Luis', apellidoPaterno: 'Borges', apellidoMaterno: 'Acevedo', ORCID: '0000-0003-3333-3333', nacionalidad: 'Argentina' },
-    { nombreAutor: 'Mario', apellidoPaterno: 'Vargas', apellidoMaterno: 'Llosa', ORCID: '0000-0004-4444-4444', nacionalidad: 'Peruana' },
-    { nombreAutor: 'Julio', apellidoPaterno: 'Cortázar', apellidoMaterno: 'Descotte', ORCID: '0000-0005-5555-5555', nacionalidad: 'Argentina' },
-    { nombreAutor: 'Pablo', apellidoPaterno: 'Neruda', apellidoMaterno: 'Basoalto', ORCID: '0000-0006-6666-6666', nacionalidad: 'Chilena' },
-    { nombreAutor: 'Stephen', apellidoPaterno: 'King', ORCID: '0000-0007-7777-7777', nacionalidad: 'Estadounidense', apellidoMaterno: null },
-    { nombreAutor: 'Anónimo', nacionalidad: null, ORCID: null, apellidoPaterno: null, apellidoMaterno: null },
+    { nombre: 'Gabriel', apellidoPaterno: 'García', apellidoMaterno: 'Márquez', ORCID: '0000-0001-1111-1111', nacionalidad: 'Colombiana' },
+    { nombre: 'Isabel', apellidoPaterno: 'Allende', apellidoMaterno: 'Llona', ORCID: '0000-0002-2222-2222', nacionalidad: 'Chilena' },
+    { nombre: 'Jorge Luis', apellidoPaterno: 'Borges', apellidoMaterno: 'Acevedo', ORCID: '0000-0003-3333-3333', nacionalidad: 'Argentina' },
+    { nombre: 'Mario', apellidoPaterno: 'Vargas', apellidoMaterno: 'Llosa', ORCID: '0000-0004-4444-4444', nacionalidad: 'Peruana' },
+    { nombre: 'Julio', apellidoPaterno: 'Cortázar', apellidoMaterno: 'Descotte', ORCID: '0000-0005-5555-5555', nacionalidad: 'Argentina' },
+    { nombre: 'Pablo', apellidoPaterno: 'Neruda', apellidoMaterno: 'Basoalto', ORCID: '0000-0006-6666-6666', nacionalidad: 'Chilena' },
+    { nombre: 'Stephen', apellidoPaterno: 'King', ORCID: '0000-0007-7777-7777', nacionalidad: 'Estadounidense', apellidoMaterno: null },
+    { nombre: 'Anónimo', nacionalidad: null, ORCID: null, apellidoPaterno: null, apellidoMaterno: null },
   ];
 
   console.log('Seeding Autores...');
@@ -120,22 +120,22 @@ async function main() {
 
   // --- 7. Libros (7) ---
   const libros = [
-    { nombreLibro: 'Cien Años de Soledad', idArea: 2, idEditorial: 1 },
-    { nombreLibro: 'Clean Code', idArea: 1, idEditorial: 5 },
-    { nombreLibro: 'La Ciudad y los Perros', idArea: 2, idEditorial: 2 },
-    { nombreLibro: 'Historia del Tiempo', idArea: 4, idEditorial: 3 },
-    { nombreLibro: 'El Principito', idArea: 2, idEditorial: 1 },
-    { nombreLibro: 'Rayuela', idArea: 2, idEditorial: 6 },
-    { nombreLibro: 'It', idArea: 2, idEditorial: 3 },
+    { nombre: 'Cien Años de Soledad', categoriaId: 2, editorialId: 1 },
+    { nombre: 'Clean Code', categoriaId: 1, editorialId: 5 },
+    { nombre: 'La Ciudad y los Perros', categoriaId: 2, editorialId: 2 },
+    { nombre: 'Historia del Tiempo', categoriaId: 4, editorialId: 3 },
+    { nombre: 'El Principito', categoriaId: 2, editorialId: 1 },
+    { nombre: 'Rayuela', categoriaId: 2, editorialId: 6 },
+    { nombre: 'It', categoriaId: 2, editorialId: 3 },
   ];
 
   console.log('Seeding Libros...');
   for (const data of libros) {
     await prisma.libro.create({
       data: {
-        nombreLibro: data.nombreLibro,
-        area: { connect: { idArea: data.idArea } },
-        editorial: { connect: { idEditorial: data.idEditorial } }
+        nombre: data.nombre,
+        categoria: { connect: { categoriaId: data.categoriaId } },
+        editorial: { connect: { editorialId: data.editorialId } }
       }
     });
   }
@@ -147,7 +147,7 @@ async function main() {
       await prisma.libroAutor.create({
         data: {
           libro: { connect: { codigoLibro: i } },
-          autor: { connect: { idAutor: i } }
+          autor: { connect: { autorId: i } }
         }
       });
     } catch (e) {
@@ -183,33 +183,33 @@ async function main() {
 
   // --- 10. Estudiantes (7) ---
   const estudiantes = [
-    { dniEstudiante: '60748729', nombreEstudiante: 'Paolo Alessandro', apellidoPaterno: 'Ursua', apellidoMaterno: 'de la Cruz', idEscuela: 1 },
-    { dniEstudiante: '70258228', nombreEstudiante: 'Monica Jannet', apellidoPaterno: 'Ursua', apellidoMaterno: 'de la Cruz', idEscuela: 4 },
-    { dniEstudiante: '61400979', nombreEstudiante: 'Valeria Vanessa', apellidoPaterno: 'Vargas', apellidoMaterno: 'Gonzales', idEscuela: 6 },
-    { dniEstudiante: '62141095', nombreEstudiante: 'Fernando Daniel', apellidoPaterno: 'Garcia', apellidoMaterno: 'Herrera', idEscuela: 4, activo: false },
-    { dniEstudiante: '60489498', nombreEstudiante: 'Kamila Alejandra', apellidoPaterno: 'Dávila', apellidoMaterno: 'Chauca', idEscuela: 7 },
-    { dniEstudiante: '60065416', nombreEstudiante: 'Anderson', apellidoPaterno: 'Casaverde', apellidoMaterno: 'Huamán', idEscuela: 2 },
-    { dniEstudiante: '70140569', nombreEstudiante: 'Lucas Gabriel', apellidoPaterno: 'Navarro', apellidoMaterno: 'Santos', idEscuela: 3 },
+    { tipoDocumento: 'DNI', numeroDocumento: '60748729', nombre: 'Paolo Alessandro', apellidoPaterno: 'Ursua', apellidoMaterno: 'de la Cruz', escuelaId: 1 },
+    { tipoDocumento: 'DNI', numeroDocumento: '70258228', nombre: 'Monica Jannet', apellidoPaterno: 'Ursua', apellidoMaterno: 'de la Cruz', escuelaId: 4 },
+    { tipoDocumento: 'DNI', numeroDocumento: '61400979', nombre: 'Valeria Vanessa', apellidoPaterno: 'Vargas', apellidoMaterno: 'Gonzales', escuelaId: 6 },
+    { tipoDocumento: 'DNI', numeroDocumento: '62141095', nombre: 'Fernando Daniel', apellidoPaterno: 'Garcia', apellidoMaterno: 'Herrera', escuelaId: 4, activo: false },
+    { tipoDocumento: 'DNI', numeroDocumento: '60489498', nombre: 'Kamila Alejandra', apellidoPaterno: 'Dávila', apellidoMaterno: 'Chauca', escuelaId: 7 },
+    { tipoDocumento: 'DNI', numeroDocumento: '60065416', nombre: 'Anderson', apellidoPaterno: 'Casaverde', apellidoMaterno: 'Huamán', escuelaId: 2 },
+    { tipoDocumento: 'DNI', numeroDocumento: '70140569', nombre: 'Lucas Gabriel', apellidoPaterno: 'Navarro', apellidoMaterno: 'Santos', escuelaId: 3 },
   ];
 
   console.log('Seeding Estudiantes...');
   for (const data of estudiantes) {
-    const { idEscuela, ...rest } = data;
+    const { escuelaId, ...rest } = data;
     await prisma.estudiante.upsert({
-      where: { dniEstudiante: data.dniEstudiante },
+      where: { numeroDocumento: data.numeroDocumento },
       update: rest,
       create: {
         ...rest,
-        escuela: { connect: { idEscuela } }
+        escuela: { connect: { escuelaId } }
       }
     });
   }
 
   // --- 11. Prestamos (7) ---
   const prestamos = [
-    { idEstudiante: 1, idBibliotecario: 1, idEjemplar: 1, estadoPrestamo: EstadoPrestamo.ACTIVO, fechaDevolucion: null, fechaLimite: new Date(new Date().setDate(new Date().getDate() + 7)) },
-    { idEstudiante: 2, idBibliotecario: 2, idEjemplar: 1, estadoPrestamo: EstadoPrestamo.DEVUELTO, fechaDevolucion: new Date(), fechaLimite: new Date(new Date().setDate(new Date().getDate() - 1)) },
-    { idEstudiante: 3, idBibliotecario: 1, idEjemplar: 1, estadoPrestamo: EstadoPrestamo.ACTIVO, fechaDevolucion: null, fechaLimite: new Date(new Date().setDate(new Date().getDate() + 7)) },
+    { estudianteId: 1, bibliotecarioId: 1, ejemplarId: 1, estadoPrestamo: EstadoPrestamo.ACTIVO, fechaDevolucion: null, fechaLimite: new Date(new Date().setDate(new Date().getDate() + 7)) },
+    { estudianteId: 2, bibliotecarioId: 2, ejemplarId: 1, estadoPrestamo: EstadoPrestamo.DEVUELTO, fechaDevolucion: new Date(), fechaLimite: new Date(new Date().setDate(new Date().getDate() - 1)) },
+    { estudianteId: 3, bibliotecarioId: 1, ejemplarId: 1, estadoPrestamo: EstadoPrestamo.ACTIVO, fechaDevolucion: null, fechaLimite: new Date(new Date().setDate(new Date().getDate() + 7)) },
   ];
 
   console.log('Seeding Prestamos...');
@@ -219,9 +219,9 @@ async function main() {
         estadoPrestamo: p.estadoPrestamo,
         fechaDevolucion: p.fechaDevolucion,
         fechaLimite: p.fechaLimite,
-        estudiante: { connect: { idEstudiante: p.idEstudiante } },
-        bibliotecario: { connect: { idBibliotecario: p.idBibliotecario } },
-        ejemplar: { connect: { idEjemplar: p.idEjemplar } },
+        estudiante: { connect: { estudianteId: p.estudianteId } },
+        bibliotecario: { connect: { bibliotecarioId: p.bibliotecarioId } },
+        ejemplar: { connect: { ejemplarId: p.ejemplarId } },
       }
     });
   }

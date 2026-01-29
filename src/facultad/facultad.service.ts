@@ -19,20 +19,20 @@ export class FacultadService {
 
     findOne(id: number) {
         return this.prisma.facultad.findUnique({
-            where: { idFacultad: id },
+            where: { facultadId: id },
         });
     }
 
     update(id: number, updateFacultadDto: UpdateFacultadDto) {
         return this.prisma.facultad.update({
-            where: { idFacultad: id },
+            where: { facultadId: id },
             data: updateFacultadDto,
         });
     }
 
     remove(id: number) {
         return this.prisma.facultad.delete({
-            where: { idFacultad: id },
+            where: { facultadId: id },
         });
     }
 }

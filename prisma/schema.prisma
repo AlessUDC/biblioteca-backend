@@ -22,61 +22,63 @@ enum EstadoEjemplar {
 }
 
 model Facultad {
-  idFacultad     Int       @id @default(autoincrement())
-  nombreFacultad String
+  facultadId Int       @id @default(autoincrement())
+  nombre     String
 
-  escuelas       Escuela[]
+  escuelas   Escuela[]
 }
 
 model Escuela {
-  idEscuela     Int       @id @default(autoincrement())
-  nombreEscuela String
-  idFacultad    Int
+  escuelaId  Int       @id @default(autoincrement())
+  nombre     String
+  facultadId Int
 
-  facultad      Facultad  @relation(fields: [idFacultad], references: [idFacultad])
-  estudiantes   Estudiante[]
+  facultad   Facultad  @relation(fields: [facultadId], references: [facultadId])
+  estudiantes Estudiante[]
 }
 
 model Estudiante {
-  idEstudiante     Int       @id @default(autoincrement())
-  dniEstudiante    String    @unique
-  nombreEstudiante String
+  estudianteId     Int       @id @default(autoincrement())
+  tipoDocumento    String
+  numeroDocumento  String    @unique
+  nombre           String
   apellidoPaterno  String
   apellidoMaterno  String
-  idEscuela        Int
+  escuelaId        Int
   activo           Boolean   @default(true)
   sanciones        Int       @default(0)
 
-  escuela          Escuela   @relation(fields: [idEscuela], references: [idEscuela])
+  escuela          Escuela   @relation(fields: [escuelaId], references: [escuelaId])
   prestamos        Prestamo[]
 }
 
 model Bibliotecario {
-  idBibliotecario     Int       @id @default(autoincrement())
-  nombreBibliotecario String
-  apellidoPaterno    String
-  apellidoMaterno    String
+  bibliotecarioId     Int       @id @default(autoincrement())
+  nombre              String
+  apellidoPaterno     String
+  apellidoMaterno     String
 
   prestamos           Prestamo[]
 }
 
-model Area {
-  idArea     Int       @id @default(autoincrement())
-  nombreArea String
+model Categoria {
+  categoriaId Int       @id @default(autoincrement())
+  nombre      String
 
-  libros     Libro[]
+  libros      Libro[]
+  @@map("Categoria") 
 }
 
 model Editorial {
-  idEditorial     Int       @id @default(autoincrement())
-  nombreEditorial String
+  editorialId Int       @id @default(autoincrement())
+  nombre      String
 
-  libros          Libro[]
+  libros      Libro[]
 }
 
 model Autor {
-  idAutor          Int       @id @default(autoincrement())
-  nombreAutor      String?
+  autorId          Int       @id @default(autoincrement())
+  nombre           String?
   apellidoPaterno  String?
   apellidoMaterno  String?
   nacionalidad     String?
@@ -87,28 +89,28 @@ model Autor {
 
 model Libro {
   codigoLibro Int       @id @default(autoincrement())
-  nombreLibro String
-  idArea      Int
-  idEditorial Int
+  nombre      String
+  categoriaId Int
+  editorialId Int
 
-  area        Area      @relation(fields: [idArea], references: [idArea])
-  editorial   Editorial @relation(fields: [idEditorial], references: [idEditorial])
+  categoria   Categoria @relation(fields: [categoriaId], references: [categoriaId])
+  editorial   Editorial @relation(fields: [editorialId], references: [editorialId])
   autores     LibroAutor[]
   ejemplares  Ejemplar[]
 }
 
 model LibroAutor {
-  idLibro Int
-  idAutor Int
+  libroId Int
+  autorId Int
 
-  libro       Libro     @relation(fields: [idLibro], references: [codigoLibro])
-  autor       Autor     @relation(fields: [idAutor], references: [idAutor])
+  libro   Libro @relation(fields: [libroId], references: [codigoLibro])
+  autor   Autor @relation(fields: [autorId], references: [autorId])
 
-  @@id([idLibro, idAutor])
+  @@id([libroId, autorId])
 }
 
 model Ejemplar {
-  idEjemplar         Int            @id @default(autoincrement())
+  ejemplarId         Int            @id @default(autoincrement())
   codigoLibro        Int            @unique
   ubicacion          String
   cantidadTotal      Int            @default(1)
@@ -120,16 +122,16 @@ model Ejemplar {
 }
 
 model Prestamo {
-  idPrestamo        Int            @id @default(autoincrement())
-  idEstudiante      Int
-  idBibliotecario   Int
-  idEjemplar        Int
+  prestamoId        Int            @id @default(autoincrement())
+  estudianteId      Int
+  bibliotecarioId   Int
+  ejemplarId        Int
   fechaPrestamo     DateTime       @default(now())
   fechaLimite       DateTime       // Fecha máxima de devolución (Deadline)
   fechaDevolucion   DateTime?
   estadoPrestamo    EstadoPrestamo
 
-  estudiante        Estudiante     @relation(fields: [idEstudiante], references: [idEstudiante])
-  bibliotecario     Bibliotecario  @relation(fields: [idBibliotecario], references: [idBibliotecario])
-  ejemplar          Ejemplar       @relation(fields: [idEjemplar], references: [idEjemplar])
+  estudiante        Estudiante     @relation(fields: [estudianteId], references: [estudianteId])
+  bibliotecario     Bibliotecario  @relation(fields: [bibliotecarioId], references: [bibliotecarioId])
+  ejemplar          Ejemplar       @relation(fields: [ejemplarId], references: [ejemplarId])
 }

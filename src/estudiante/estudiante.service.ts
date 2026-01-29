@@ -24,7 +24,7 @@ export class EstudianteService {
 
     async findOne(id: number) {
         const estudiante = await this.prisma.estudiante.findFirst({
-            where: { idEstudiante: id, activo: true },
+            where: { estudianteId: id, activo: true },
             include: {
                 escuela: true,
             },
@@ -37,20 +37,20 @@ export class EstudianteService {
 
     update(id: number, updateEstudianteDto: UpdateEstudianteDto) {
         return this.prisma.estudiante.update({
-            where: { idEstudiante: id },
+            where: { estudianteId: id },
             data: updateEstudianteDto,
         });
     }
 
     async remove(id: number) {
         const estudiante = await this.prisma.estudiante.findFirst({
-            where: { idEstudiante: id, activo: true },
+            where: { estudianteId: id, activo: true },
         });
         if (!estudiante) {
             throw new NotFoundException(`Estudiante with ID ${id} not found`);
         }
         return this.prisma.estudiante.update({
-            where: { idEstudiante: id },
+            where: { estudianteId: id },
             data: { activo: false },
         });
     }

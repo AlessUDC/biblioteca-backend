@@ -3,7 +3,7 @@ import { IsString, IsNotEmpty, IsOptional, MinLength } from 'class-validator';
 export class CreateAutorDto {
     @IsString()
     @IsOptional()
-    nombreAutor?: string;
+    nombre: string;
 
     @IsString()
     @IsOptional()

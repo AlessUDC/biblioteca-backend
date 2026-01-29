@@ -4,13 +4,13 @@ export class CreateLibroDto {
     @IsString()
     @IsNotEmpty()
     @MinLength(2)
-    nombreLibro: string;
+    nombre: string;
 
     @IsInt()
-    idArea: number;
+    categoriaId: number;
 
     @IsInt()
-    idEditorial: number;
+    editorialId: number;
 
     @IsArray()
     @ArrayMinSize(1)

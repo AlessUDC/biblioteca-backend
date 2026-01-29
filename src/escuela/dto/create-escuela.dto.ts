@@ -4,8 +4,8 @@ export class CreateEscuelaDto {
     @IsString()
     @IsNotEmpty()
     @MinLength(3)
-    nombreEscuela: string;
+    nombre: string;
 
     @IsInt()
-    idFacultad: number;
+    facultadId: number;
 }
