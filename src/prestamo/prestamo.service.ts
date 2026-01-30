@@ -32,20 +32,17 @@ export class PrestamoService {
                 },
             });
 
-            const activeLoansCount = activeLoans.length;
-
-            if (activeLoansCount >= MAX_LOANS) {
+            if (activeLoans.length >= MAX_LOANS) {
                 throw new ConflictException(
                     `El estudiante ya tiene el máximo de ${MAX_LOANS} libros prestados.`,
                 );
             }
 
-            // 2.1 Check for overdue loans (Sanción)
+            // 2.1 Check for overdue loans
             const nowForOverdue = new Date();
             const overdueLoansCount = activeLoans.filter(l => l.fechaDevolucion && l.fechaDevolucion < nowForOverdue).length;
 
             if (overdueLoansCount >= 3) {
-                // Deactivate student as penalty
                 await tx.estudiante.update({
                     where: { estudianteId: createPrestamoDto.estudianteId },
                     data: { activo: false },
@@ -55,8 +52,7 @@ export class PrestamoService {
                 );
             }
 
-            // 3. Check if Exemplar is available with ROW LOCK (FOR UPDATE)
-            // We use raw query to enforce database-level lock on the row
+            // 3. Check if Exemplar is available with ROW LOCK
             const ejemplares = await tx.$queryRaw<any[]>`
                 SELECT * FROM "Ejemplar" 
                 WHERE "ejemplarId" = ${createPrestamoDto.ejemplarId} 
@@ -66,44 +62,32 @@ export class PrestamoService {
             if (ejemplares.length === 0) throw new NotFoundException('Ejemplar no encontrado');
             const ejemplar = ejemplares[0];
 
-            // Manual check because raw result fields might be lowercase depending on driver, 
-            // but usually matching DB column names. Prisma raw returns exact column names.
-            if (ejemplar.cantidadDisponible <= 0) {
-                throw new ConflictException('No hay ejemplares disponibles para préstamo.');
+            // Unit Model Check
+            if (ejemplar.estado !== EstadoEjemplar.DISPONIBLE) {
+                throw new ConflictException(`El ejemplar no está disponible (Estado actual: ${ejemplar.estado}).`);
             }
 
-            // 4. Create the loan and update stock
+            // 4. Create the loan and update status
             const now = new Date();
             const fechaLimite = new Date(createPrestamoDto.fechaLimite);
 
-            if (isNaN(fechaLimite.getTime())) {
+            if (isNaN(fechaLimite.getTime()) || fechaLimite < now) {
                 throw new BadRequestException('Fecha límite inválida.');
             }
 
-            if (fechaLimite < now) {
-                throw new BadRequestException(
-                    'La fecha límite de devolución no puede ser anterior a la fecha actual.',
-                );
-            }
-
-            // (Optional) validate explicit return date if provided, though usually it's null on create
             const fechaDevolucion = createPrestamoDto.fechaDevolucion
                 ? new Date(createPrestamoDto.fechaDevolucion)
                 : null;
 
             if (fechaDevolucion && fechaDevolucion < now) {
-                throw new BadRequestException(
-                    'La fecha de devolución programada no puede ser en el pasado.',
-                );
+                throw new BadRequestException('La fecha de devolución programada no puede ser en el pasado.');
             }
 
-            // Update Stock: Decrement cantidadDisponible
-            const newDisponible = ejemplar.cantidadDisponible - 1;
+            // Update Unit State to PRESTADO
             await tx.ejemplar.update({
                 where: { ejemplarId: createPrestamoDto.ejemplarId },
                 data: {
-                    cantidadDisponible: newDisponible,
-                    estado: newDisponible === 0 ? EstadoEjemplar.PRESTADO : EstadoEjemplar.DISPONIBLE,
+                    estado: EstadoEjemplar.PRESTADO,
                 },
             });
 
@@ -163,17 +147,14 @@ export class PrestamoService {
             const prevEstado = prestamo.estadoPrestamo;
             const nextEstado = updatePrestamoDto.estadoPrestamo;
 
-            // Logic for dates validation
+            // Date validation (omitted for brevity, same as before roughly)
             if (updatePrestamoDto.fechaDevolucion) {
                 const newFechaDev = new Date(updatePrestamoDto.fechaDevolucion);
                 if (newFechaDev < prestamo.fechaPrestamo) {
-                    throw new BadRequestException(
-                        'La fecha de devolución no puede ser anterior a la fecha de préstamo.',
-                    );
+                    throw new BadRequestException('La fecha de devolución no puede ser anterior a la fecha de préstamo.');
                 }
             }
 
-            // Prepare update data
             const data: Prisma.PrestamoUpdateInput = {
                 estadoPrestamo: nextEstado,
                 fechaDevolucion: updatePrestamoDto.fechaDevolucion
@@ -181,7 +162,7 @@ export class PrestamoService {
                     : (nextEstado === EstadoPrestamo.DEVUELTO ? new Date() : undefined),
             };
 
-            // Handle Side Effects on Stock and Student if status changes
+            // Status Transitions
             if (nextEstado && nextEstado !== prevEstado) {
                 const ejemplar = await tx.ejemplar.findUnique({
                     where: { ejemplarId: prestamo.ejemplarId },
@@ -189,31 +170,23 @@ export class PrestamoService {
 
                 if (!ejemplar) throw new NotFoundException('Ejemplar no encontrado');
 
-                // Transitions FROM ACTIVO
+                // FROM ACTIVO
                 if (prevEstado === EstadoPrestamo.ACTIVO) {
                     if (nextEstado === EstadoPrestamo.DEVUELTO) {
-                        // RETURNED: Increment stock
-                        const newDisponible = ejemplar.cantidadDisponible + 1;
+                        // Mark Unit as DISPONIBLE
                         await tx.ejemplar.update({
                             where: { ejemplarId: ejemplar.ejemplarId },
-                            data: {
-                                cantidadDisponible: newDisponible,
-                                estado: EstadoEjemplar.DISPONIBLE,
-                            },
+                            data: { estado: EstadoEjemplar.DISPONIBLE },
                         });
 
-                        // Check for Late Return (Sanción persistente)
+                        // Check Late Return
                         const fechaRetorno = (data.fechaDevolucion as Date) || new Date();
-
                         if (prestamo.fechaLimite && fechaRetorno > prestamo.fechaLimite) {
-                            // Increment persistent sanctions
-                            const estudianteUpdated = await tx.estudiante.update({
+                            const est = await tx.estudiante.update({
                                 where: { estudianteId: prestamo.estudianteId },
                                 data: { sanciones: { increment: 1 } },
                             });
-
-                            // Apply penalty threshold
-                            if (estudianteUpdated.sanciones >= 3) {
+                            if (est.sanciones >= 3) {
                                 await tx.estudiante.update({
                                     where: { estudianteId: prestamo.estudianteId },
                                     data: { activo: false },
@@ -221,47 +194,33 @@ export class PrestamoService {
                             }
                         }
                     } else if (nextEstado === EstadoPrestamo.PERDIDO) {
-                        // LOST: Decrement total quantity, de-activate student
+                        // Mark Unit as PERDIDO
                         await tx.ejemplar.update({
                             where: { ejemplarId: ejemplar.ejemplarId },
-                            data: {
-                                cantidadTotal: { decrement: 1 },
-                                // If disponible was 0, it might still be 0, but total is less.
-                                // If it was already lent, disponible stays same.
-                            },
+                            data: { estado: EstadoEjemplar.PERDIDO },
                         });
-
                         await tx.estudiante.update({
                             where: { estudianteId: prestamo.estudianteId },
                             data: { activo: false },
                         });
                     }
                 }
-
-                // Transitions TO ACTIVO (e.g. correcting a mistake)
+                // TO ACTIVO (Undo)
                 else if (nextEstado === EstadoPrestamo.ACTIVO) {
-                    if (ejemplar.cantidadDisponible <= 0) {
-                        throw new ConflictException('No hay ejemplares disponibles para reactivar este préstamo.');
+                    if (ejemplar.estado !== EstadoEjemplar.DISPONIBLE && ejemplar.estado !== EstadoEjemplar.PERDIDO) {
+                        // Warning: If it was DISPONIBLE we can grab it. 
+                        // If it was already lent to someone else (unlikely given ID check, but physically possible if ID reused), we conflict.
+                        // But here we just assume if we are reactivating THIS loan, we want THIS exemplar.
+                        // Strict check:
+                        if (ejemplar.estado === EstadoEjemplar.PRESTADO) {
+                            throw new ConflictException('El ejemplar ya está prestado (posiblemente a otro usuario).');
+                        }
                     }
-                    const newDisponible = ejemplar.cantidadDisponible - 1;
+
                     await tx.ejemplar.update({
                         where: { ejemplarId: ejemplar.ejemplarId },
-                        data: {
-                            cantidadDisponible: newDisponible,
-                            estado: newDisponible === 0 ? EstadoEjemplar.NO_DISPONIBLE : EstadoEjemplar.DISPONIBLE,
-                        },
+                        data: { estado: EstadoEjemplar.PRESTADO },
                     });
-
-                    // If it was lost, we might need to restore total count? 
-                    // Usually mistakes are better handled by deleting and re-creating, 
-                    // but let's handle the total count restore if it was PERDIDO
-                    if (prevEstado === EstadoPrestamo.PERDIDO) {
-                        await tx.ejemplar.update({
-                            where: { ejemplarId: ejemplar.ejemplarId },
-                            data: { cantidadTotal: { increment: 1 } },
-                        });
-                        // Note: Not auto-activating student because we don't know why they were deactivated.
-                    }
                 }
             }
 
@@ -273,7 +232,7 @@ export class PrestamoService {
     }
 
     remove(id: number) {
-        throw new BadRequestException('No se permite eliminar préstamos. Use los cambios de estado (DEVUELTO/PERDIDO) para mantener la trazabilidad.');
+        throw new BadRequestException('No se permite eliminar préstamos.');
     }
 }
 

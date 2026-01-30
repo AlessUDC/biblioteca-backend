@@ -15,13 +15,8 @@ export class CreateEjemplarDto {
     })
     estado?: string;
 
-    @IsInt()
-    @Min(0)
-    @IsOptional()
-    cantidadTotal?: number;
-
-    @IsInt()
-    @Min(0)
-    @IsOptional()
-    cantidadDisponible?: number;
+    @IsString()
+    @IsNotEmpty()
+    @IsOptional() // Made optional as per my plan, can be strict if needed
+    codigoBarras?: string;
 }

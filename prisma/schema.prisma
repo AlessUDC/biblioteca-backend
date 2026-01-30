@@ -111,10 +111,9 @@ model LibroAutor {
 
 model Ejemplar {
   ejemplarId         Int            @id @default(autoincrement())
-  codigoLibro        Int            @unique
+  codigoLibro        Int
   ubicacion          String
-  cantidadTotal      Int            @default(1)
-  cantidadDisponible Int            @default(1)
+  codigoBarras       String?        @unique
   estado             EstadoEjemplar @default(DISPONIBLE)
 
   libro     Libro      @relation(fields: [codigoLibro], references: [codigoLibro])
