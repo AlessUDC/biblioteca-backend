@@ -9,15 +9,53 @@ export class EjemplarService {
     constructor(private prisma: PrismaService) { }
 
     async create(createEjemplarDto: CreateEjemplarDto) {
-        // En el nuevo modelo, creamos una unidad física indivisible
-        return this.prisma.ejemplar.create({
-            data: {
-                codigoLibro: createEjemplarDto.codigoLibro,
-                ubicacion: createEjemplarDto.ubicacion,
-                codigoBarras: createEjemplarDto.codigoBarras,
-                estado: (createEjemplarDto.estado as EstadoEjemplar) || EstadoEjemplar.DISPONIBLE,
-            },
+        // Verificar que el libro existe
+        const libroExists = await this.prisma.libro.findUnique({
+            where: { codigoLibro: createEjemplarDto.codigoLibro },
         });
+
+        if (!libroExists) {
+            throw new NotFoundException(
+                `No existe un libro con codigoLibro ${createEjemplarDto.codigoLibro}`
+            );
+        }
+
+        try {
+            // En el nuevo modelo, creamos una unidad física indivisible
+            return await this.prisma.ejemplar.create({
+                data: {
+                    codigoLibro: createEjemplarDto.codigoLibro,
+                    ubicacion: createEjemplarDto.ubicacion,
+                    codigoBarras: createEjemplarDto.codigoBarras,
+                    estado: (createEjemplarDto.estado as EstadoEjemplar) || EstadoEjemplar.DISPONIBLE,
+                },
+                include: {
+                    libro: {
+                        include: {
+                            categoria: true,
+                            editorial: true,
+                            autores: {
+                                include: {
+                                    autor: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+        } catch (error) {
+            if (error.code === 'P2002') {
+                throw new ConflictException(
+                    `Ya existe un ejemplar con este código de barras: ${createEjemplarDto.codigoBarras}`
+                );
+            }
+            if (error.code === 'P2003') {
+                throw new BadRequestException(
+                    `Referencia inválida. Verifica que el libro con codigoLibro ${createEjemplarDto.codigoLibro} exista.`
+                );
+            }
+            throw error;
+        }
     }
 
     findAll() {
@@ -58,40 +96,90 @@ export class EjemplarService {
     }
 
     async update(id: number, updateEjemplarDto: UpdateEjemplarDto) {
-        // Validación básica: si se intenta cambiar a DISPONIBLE, asegurar que no esté prestado?
-        // En realidad, el estado se maneja manualmente o por Préstamos.
-        // Si hay un préstamo activo, no debería poder pasarse a DISPONIBLE manualmente sin cerrar el préstamo.
-        // Pero por ahora mantenemos la lógica simple CRUD.
-
-        return this.prisma.ejemplar.update({
+        // Verificar que el ejemplar existe
+        const ejemplarExists = await this.prisma.ejemplar.findUnique({
             where: { ejemplarId: id },
-            data: {
-                codigoLibro: updateEjemplarDto.codigoLibro,
-                ubicacion: updateEjemplarDto.ubicacion,
-                codigoBarras: updateEjemplarDto.codigoBarras,
-                estado: updateEjemplarDto.estado as EstadoEjemplar,
-            },
-        });
-    }
-
-    async remove(id: number) {
-        // Verificar Préstamos Activos
-        const activeLoans = await this.prisma.prestamo.count({
-            where: {
-                ejemplarId: id,
-                estadoPrestamo: EstadoPrestamo.ACTIVO,
-            },
         });
 
-        if (activeLoans > 0) {
-            throw new ConflictException(
-                `No se puede eliminar el ejemplar porque tiene un préstamo activo.`,
+        if (!ejemplarExists) {
+            throw new NotFoundException(
+                `No existe un ejemplar con ejemplarId ${id}`
             );
         }
 
-        return this.prisma.ejemplar.delete({
-            where: { ejemplarId: id },
+        // Si se está actualizando el codigoLibro, verificar que el nuevo libro existe
+        if (updateEjemplarDto.codigoLibro && updateEjemplarDto.codigoLibro !== ejemplarExists.codigoLibro) {
+            const libroExists = await this.prisma.libro.findUnique({
+                where: { codigoLibro: updateEjemplarDto.codigoLibro },
+            });
+
+            if (!libroExists) {
+                throw new NotFoundException(
+                    `No existe un libro con codigoLibro ${updateEjemplarDto.codigoLibro}`
+                );
+            }
+        }
+
+        try {
+            return await this.prisma.ejemplar.update({
+                where: { ejemplarId: id },
+                data: {
+                    codigoLibro: updateEjemplarDto.codigoLibro,
+                    ubicacion: updateEjemplarDto.ubicacion,
+                    codigoBarras: updateEjemplarDto.codigoBarras,
+                    estado: updateEjemplarDto.estado as EstadoEjemplar,
+                },
+                include: {
+                    libro: {
+                        include: {
+                            categoria: true,
+                            editorial: true,
+                            autores: {
+                                include: {
+                                    autor: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+        } catch (error) {
+            if (error.code === 'P2002') {
+                throw new ConflictException(
+                    `Ya existe un ejemplar con este código de barras: ${updateEjemplarDto.codigoBarras}`
+                );
+            }
+            if (error.code === 'P2003') {
+                throw new BadRequestException(
+                    `Referencia inválida. Verifica que el libro exista.`
+                );
+            }
+            throw error;
+        }
+    }
+
+    async remove(id: number) {
+        // Keeping this method compatible with Unit Model by simply deleting the record
+        // The original logic in conflict was Quantity based, so we replace it with simple delete for now
+        // or check for active loans before deleting.
+
+        return this.prisma.$transaction(async (tx) => {
+            const existing = await tx.ejemplar.findUnique({
+                where: { ejemplarId: id },
+            });
+
+            if (!existing) {
+                throw new NotFoundException(`Ejemplar con ID ${id} no encontrado`);
+            }
+
+            // Check if it's currently lent
+            if (existing.estado === EstadoEjemplar.PRESTADO) {
+                throw new ConflictException(`No se puede eliminar el ejemplar porque está prestado.`);
+            }
+
+            return tx.ejemplar.delete({
+                where: { ejemplarId: id },
+            });
         });
     }
 }
-

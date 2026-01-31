@@ -6,11 +6,15 @@ export class CreateLibroDto {
     @MinLength(2)
     nombre: string;
 
-    @IsInt()
-    categoriaId: number;
+    @IsArray()
+    @ArrayMinSize(1)
+    @IsInt({ each: true })
+    categoriasIds: number[];
 
-    @IsInt()
-    editorialId: number;
+    @IsArray()
+    @ArrayMinSize(1)
+    @IsInt({ each: true })
+    editorialesIds: number[];
 
     @IsArray()
     @ArrayMinSize(1)

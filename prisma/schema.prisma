@@ -66,7 +66,6 @@ model Categoria {
   nombre      String
 
   libros      Libro[]
-  @@map("Categoria") 
 }
 
 model Editorial {
@@ -90,11 +89,8 @@ model Autor {
 model Libro {
   codigoLibro Int       @id @default(autoincrement())
   nombre      String
-  categoriaId Int
-  editorialId Int
-
-  categoria   Categoria @relation(fields: [categoriaId], references: [categoriaId])
-  editorial   Editorial @relation(fields: [editorialId], references: [editorialId])
+  categorias  Categoria[]
+  editoriales Editorial[]
   autores     LibroAutor[]
   ejemplares  Ejemplar[]
 }
