@@ -32,8 +32,8 @@ export class EjemplarService {
                 include: {
                     libro: {
                         include: {
-                            categoria: true,
-                            editorial: true,
+                            categorias: true,
+                            editoriales: true,
                             autores: {
                                 include: {
                                     autor: true,
@@ -63,8 +63,8 @@ export class EjemplarService {
             include: {
                 libro: {
                     include: {
-                        categoria: true,
-                        editorial: true,
+                        categorias: true,
+                        editoriales: true,
                         autores: {
                             include: {
                                 autor: true,
@@ -82,8 +82,8 @@ export class EjemplarService {
             include: {
                 libro: {
                     include: {
-                        categoria: true,
-                        editorial: true,
+                        categorias: true,
+                        editoriales: true,
                         autores: {
                             include: {
                                 autor: true,
@@ -132,8 +132,8 @@ export class EjemplarService {
                 include: {
                     libro: {
                         include: {
-                            categoria: true,
-                            editorial: true,
+                            categorias: true,
+                            editoriales: true,
                             autores: {
                                 include: {
                                     autor: true,

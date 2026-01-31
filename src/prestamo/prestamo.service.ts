@@ -1,4 +1,5 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { EstadoPrestamo, EstadoEjemplar, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePrestamoDto } from './dto/create-prestamo.dto';
@@ -6,6 +7,8 @@ import { UpdatePrestamoDto } from './dto/update-prestamo.dto';
 
 @Injectable()
 export class PrestamoService {
+    private readonly logger = new Logger(PrestamoService.name);
+
     constructor(private prisma: PrismaService) { }
 
     async create(createPrestamoDto: CreatePrestamoDto) {
@@ -133,8 +136,8 @@ export class PrestamoService {
                     include: {
                         libro: {
                             include: {
-                                categoria: true,
-                                editorial: true,
+                                categorias: true,
+                                editoriales: true,
                                 autores: { include: { autor: true } }
                             }
                         },
@@ -154,8 +157,8 @@ export class PrestamoService {
                     include: {
                         libro: {
                             include: {
-                                categoria: true,
-                                editorial: true,
+                                categorias: true,
+                                editoriales: true,
                                 autores: { include: { autor: true } }
                             }
                         },
@@ -176,10 +179,17 @@ export class PrestamoService {
                 });
 
                 // Mark Student as inactive (Sanction)
-                await tx.estudiante.update({
+                const updatedStudent = await tx.estudiante.update({
                     where: { estudianteId: prestamo.estudianteId },
-                    data: { activo: false },
+                    data: { sanciones: { increment: 1 } },
                 });
+
+                if (updatedStudent.sanciones >= 3) {
+                    await tx.estudiante.update({
+                        where: { estudianteId: prestamo.estudianteId },
+                        data: { activo: false },
+                    });
+                }
 
                 // Update Loan to PERDIDO
                 return await tx.prestamo.update({
@@ -192,8 +202,8 @@ export class PrestamoService {
                             include: {
                                 libro: {
                                     include: {
-                                        categoria: true,
-                                        editorial: true,
+                                        categorias: true,
+                                        editoriales: true,
                                         autores: { include: { autor: true } }
                                     }
                                 },
@@ -312,8 +322,8 @@ export class PrestamoService {
                             include: {
                                 libro: {
                                     include: {
-                                        categoria: true,
-                                        editorial: true,
+                                        categorias: true,
+                                        editoriales: true,
                                         autores: { include: { autor: true } }
                                     }
                                 },
@@ -345,5 +355,62 @@ export class PrestamoService {
             throw new NotFoundException(`No se encontró el registro solicitado.`);
         }
         throw error;
+    }
+
+    @Cron(CronExpression.EVERY_MINUTE) // Check every minute for testing. Change to EVERY_HOUR for production.
+    async handleOverdueLoans() {
+        this.logger.debug('Checking for overdue loans...');
+        const now = new Date();
+
+        const overdueLoans = await this.prisma.prestamo.findMany({
+            where: {
+                estadoPrestamo: EstadoPrestamo.ACTIVO,
+                fechaLimite: {
+                    lt: now,
+                },
+            },
+        });
+
+        if (overdueLoans.length === 0) {
+            this.logger.debug('No overdue loans found.');
+            return;
+        }
+
+        this.logger.log(`Found ${overdueLoans.length} overdue loans. Processing...`);
+
+        for (const loan of overdueLoans) {
+            try {
+                await this.prisma.$transaction(async (tx) => {
+                    // Mark Exemplar as PERDIDO
+                    await tx.ejemplar.update({
+                        where: { ejemplarId: loan.ejemplarId },
+                        data: { estado: EstadoEjemplar.PERDIDO },
+                    });
+
+                    // Mark Student as inactive (Sanction)
+                    const updatedStudent = await tx.estudiante.update({
+                        where: { estudianteId: loan.estudianteId },
+                        data: { sanciones: { increment: 1 } },
+                    });
+
+                    if (updatedStudent.sanciones >= 3) {
+                        await tx.estudiante.update({
+                            where: { estudianteId: loan.estudianteId },
+                            data: { activo: false },
+                        });
+                        this.logger.log(`Student ${loan.estudianteId} deactivated due to accumulating ${updatedStudent.sanciones} sanctions.`);
+                    }
+
+                    // Update Loan to PERDIDO
+                    await tx.prestamo.update({
+                        where: { prestamoId: loan.prestamoId },
+                        data: { estadoPrestamo: EstadoPrestamo.PERDIDO },
+                    });
+                });
+                this.logger.log(`Loan ${loan.prestamoId} marked as PERDIDO. Student ${loan.estudianteId} sanctioned.`);
+            } catch (error) {
+                this.logger.error(`Failed to process overdue loan ${loan.prestamoId}`, error.stack);
+            }
+        }
     }
 }
