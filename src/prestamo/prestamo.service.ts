@@ -11,114 +11,117 @@ export class PrestamoService {
     async create(createPrestamoDto: CreatePrestamoDto) {
         const MAX_LOANS = 7;
 
-        return this.prisma.$transaction(async (tx) => {
-            // 1. Check Student
-            const estudiante = await tx.estudiante.findUnique({
-                where: { estudianteId: createPrestamoDto.estudianteId },
-            });
-
-            if (!estudiante) throw new NotFoundException('Estudiante no encontrado');
-            if (!estudiante.activo) {
-                throw new ConflictException(
-                    'El estudiante no está activo para realizar préstamos (posible sanción).',
-                );
-            }
-
-            // 2. Check student's current active loans
-            const activeLoans = await tx.prestamo.findMany({
-                where: {
-                    estudianteId: createPrestamoDto.estudianteId,
-                    estadoPrestamo: EstadoPrestamo.ACTIVO,
-                },
-            });
-
-            const activeLoansCount = activeLoans.length;
-
-            if (activeLoansCount >= MAX_LOANS) {
-                throw new ConflictException(
-                    `El estudiante ya tiene el máximo de ${MAX_LOANS} libros prestados.`,
-                );
-            }
-
-            // 2.1 Check for overdue loans (Sanción)
-            const nowForOverdue = new Date();
-            const overdueLoansCount = activeLoans.filter(l => l.fechaDevolucion && l.fechaDevolucion < nowForOverdue).length;
-
-            if (overdueLoansCount >= 3) {
-                // Deactivate student as penalty
-                await tx.estudiante.update({
+        try {
+            return await this.prisma.$transaction(async (tx) => {
+                // 1. Check Student
+                const estudiante = await tx.estudiante.findUnique({
                     where: { estudianteId: createPrestamoDto.estudianteId },
-                    data: { activo: false },
                 });
-                throw new ConflictException(
-                    `El estudiante ha sido desactivado por tener ${overdueLoansCount} libros vencidos sin devolver.`,
-                );
-            }
 
-            // 3. Check if Exemplar is available with ROW LOCK (FOR UPDATE)
-            // We use raw query to enforce database-level lock on the row
-            const ejemplares = await tx.$queryRaw<any[]>`
-                SELECT * FROM "Ejemplar" 
-                WHERE "ejemplarId" = ${createPrestamoDto.ejemplarId} 
-                FOR UPDATE
-            `;
+                if (!estudiante) throw new NotFoundException('Estudiante no encontrado');
+                if (!estudiante.activo) {
+                    throw new ConflictException(
+                        'El estudiante no está activo para realizar préstamos (posible sanción).',
+                    );
+                }
 
-            if (ejemplares.length === 0) throw new NotFoundException('Ejemplar no encontrado');
-            const ejemplar = ejemplares[0];
+                // 1.1 Check Librarian
+                const bibliotecario = await tx.bibliotecario.findUnique({
+                    where: { bibliotecarioId: createPrestamoDto.bibliotecarioId },
+                });
+                if (!bibliotecario) throw new NotFoundException('Bibliotecario no encontrado');
 
-            // Manual check because raw result fields might be lowercase depending on driver, 
-            // but usually matching DB column names. Prisma raw returns exact column names.
-            if (ejemplar.cantidadDisponible <= 0) {
-                throw new ConflictException('No hay ejemplares disponibles para préstamo.');
-            }
+                // 2. Check student's current active loans
+                const activeLoans = await tx.prestamo.findMany({
+                    where: {
+                        estudianteId: createPrestamoDto.estudianteId,
+                        estadoPrestamo: EstadoPrestamo.ACTIVO,
+                    },
+                });
 
-            // 4. Create the loan and update stock
-            const now = new Date();
-            const fechaLimite = new Date(createPrestamoDto.fechaLimite);
+                if (activeLoans.length >= MAX_LOANS) {
+                    throw new ConflictException(
+                        `El estudiante ya tiene el máximo de ${MAX_LOANS} libros prestados.`,
+                    );
+                }
 
-            if (isNaN(fechaLimite.getTime())) {
-                throw new BadRequestException('Fecha límite inválida.');
-            }
+                // 2.1 Check for overdue loans
+                const nowForOverdue = new Date();
+                const overdueLoansCount = activeLoans.filter(l => l.fechaDevolucion && l.fechaDevolucion < nowForOverdue).length;
 
-            if (fechaLimite < now) {
-                throw new BadRequestException(
-                    'La fecha límite de devolución no puede ser anterior a la fecha actual.',
-                );
-            }
+                if (overdueLoansCount >= 3) {
+                    await tx.estudiante.update({
+                        where: { estudianteId: createPrestamoDto.estudianteId },
+                        data: { activo: false },
+                    });
+                    throw new ConflictException(
+                        `El estudiante ha sido desactivado por tener ${overdueLoansCount} libros vencidos sin devolver.`,
+                    );
+                }
 
-            // (Optional) validate explicit return date if provided, though usually it's null on create
-            const fechaDevolucion = createPrestamoDto.fechaDevolucion
-                ? new Date(createPrestamoDto.fechaDevolucion)
-                : null;
+                // 3. Check if Exemplar is available with ROW LOCK
+                const ejemplares = await tx.$queryRaw<any[]>`
+                    SELECT * FROM "Ejemplar" 
+                    WHERE "ejemplarId" = ${createPrestamoDto.ejemplarId} 
+                    FOR UPDATE
+                `;
 
-            if (fechaDevolucion && fechaDevolucion < now) {
-                throw new BadRequestException(
-                    'La fecha de devolución programada no puede ser en el pasado.',
-                );
-            }
+                if (ejemplares.length === 0) throw new NotFoundException('Ejemplar no encontrado');
+                const ejemplar = ejemplares[0];
 
-            // Update Stock: Decrement cantidadDisponible
-            const newDisponible = ejemplar.cantidadDisponible - 1;
-            await tx.ejemplar.update({
-                where: { ejemplarId: createPrestamoDto.ejemplarId },
-                data: {
-                    cantidadDisponible: newDisponible,
-                    estado: newDisponible === 0 ? EstadoEjemplar.PRESTADO : EstadoEjemplar.DISPONIBLE,
-                },
+                // Unit Model Check
+                if (ejemplar.estado !== EstadoEjemplar.DISPONIBLE) {
+                    throw new ConflictException(`El ejemplar no está disponible (Estado actual: ${ejemplar.estado}).`);
+                }
+
+                // 4. Create the loan and update status
+                const now = new Date();
+                const fechaLimite = new Date(createPrestamoDto.fechaLimite);
+
+                if (isNaN(fechaLimite.getTime()) || fechaLimite < now) {
+                    throw new BadRequestException('Fecha límite inválida.');
+                }
+
+                const fechaDevolucion = createPrestamoDto.fechaDevolucion
+                    ? new Date(createPrestamoDto.fechaDevolucion)
+                    : null;
+
+                if (fechaDevolucion && fechaDevolucion < now) {
+                    throw new BadRequestException('La fecha de devolución programada no puede ser en el pasado.');
+                }
+
+                // Update Unit State to PRESTADO
+                await tx.ejemplar.update({
+                    where: { ejemplarId: createPrestamoDto.ejemplarId },
+                    data: {
+                        estado: EstadoEjemplar.PRESTADO,
+                    },
+                });
+
+                return await tx.prestamo.create({
+                    data: {
+                        estadoPrestamo: EstadoPrestamo.ACTIVO,
+                        fechaPrestamo: now,
+                        fechaLimite: fechaLimite,
+                        fechaDevolucion: fechaDevolucion,
+                        estudiante: { connect: { estudianteId: createPrestamoDto.estudianteId } },
+                        bibliotecario: { connect: { bibliotecarioId: createPrestamoDto.bibliotecarioId } },
+                        ejemplar: { connect: { ejemplarId: createPrestamoDto.ejemplarId } },
+                    },
+                    include: {
+                        estudiante: true,
+                        bibliotecario: true,
+                        ejemplar: {
+                            include: {
+                                libro: true,
+                            },
+                        },
+                    },
+                });
             });
-
-            return tx.prestamo.create({
-                data: {
-                    estadoPrestamo: EstadoPrestamo.ACTIVO,
-                    fechaPrestamo: now,
-                    fechaLimite: fechaLimite,
-                    fechaDevolucion: fechaDevolucion,
-                    estudiante: { connect: { estudianteId: createPrestamoDto.estudianteId } },
-                    bibliotecario: { connect: { bibliotecarioId: createPrestamoDto.bibliotecarioId } },
-                    ejemplar: { connect: { ejemplarId: createPrestamoDto.ejemplarId } },
-                },
-            });
-        });
+        } catch (error) {
+            this.handlePrismaError(error);
+        }
     }
 
     findAll() {
@@ -128,152 +131,219 @@ export class PrestamoService {
                 bibliotecario: true,
                 ejemplar: {
                     include: {
-                        libro: true,
+                        libro: {
+                            include: {
+                                categoria: true,
+                                editorial: true,
+                                autores: { include: { autor: true } }
+                            }
+                        },
                     },
                 },
             },
         });
     }
 
-    findOne(id: number) {
-        return this.prisma.prestamo.findUnique({
+    async findOne(id: number) {
+        const prestamo = await this.prisma.prestamo.findUnique({
             where: { prestamoId: id },
             include: {
                 estudiante: true,
                 bibliotecario: true,
                 ejemplar: {
                     include: {
-                        libro: true,
+                        libro: {
+                            include: {
+                                categoria: true,
+                                editorial: true,
+                                autores: { include: { autor: true } }
+                            }
+                        },
                     },
                 },
             },
         });
+
+        if (!prestamo) return null;
+
+        // Lazy Expiration Check: If ACTIVO and Overdue -> PERDIDO
+        if (prestamo.estadoPrestamo === EstadoPrestamo.ACTIVO && prestamo.fechaLimite < new Date()) {
+            return await this.prisma.$transaction(async (tx) => {
+                // Mark Exemplar as PERDIDO
+                await tx.ejemplar.update({
+                    where: { ejemplarId: prestamo.ejemplarId },
+                    data: { estado: EstadoEjemplar.PERDIDO },
+                });
+
+                // Mark Student as inactive (Sanction)
+                await tx.estudiante.update({
+                    where: { estudianteId: prestamo.estudianteId },
+                    data: { activo: false },
+                });
+
+                // Update Loan to PERDIDO
+                return await tx.prestamo.update({
+                    where: { prestamoId: id },
+                    data: { estadoPrestamo: EstadoPrestamo.PERDIDO },
+                    include: {
+                        estudiante: true,
+                        bibliotecario: true,
+                        ejemplar: {
+                            include: {
+                                libro: {
+                                    include: {
+                                        categoria: true,
+                                        editorial: true,
+                                        autores: { include: { autor: true } }
+                                    }
+                                },
+                            },
+                        },
+                    },
+                });
+            });
+        }
+
+        return prestamo;
     }
 
     async update(id: number, updatePrestamoDto: UpdatePrestamoDto) {
-        return this.prisma.$transaction(async (tx) => {
-            const prestamo = await tx.prestamo.findUnique({
-                where: { prestamoId: id },
-            });
-
-            if (!prestamo) {
-                throw new NotFoundException(`Prestamo con ID ${id} no encontrado`);
-            }
-
-            const prevEstado = prestamo.estadoPrestamo;
-            const nextEstado = updatePrestamoDto.estadoPrestamo;
-
-            // Logic for dates validation
-            if (updatePrestamoDto.fechaDevolucion) {
-                const newFechaDev = new Date(updatePrestamoDto.fechaDevolucion);
-                if (newFechaDev < prestamo.fechaPrestamo) {
-                    throw new BadRequestException(
-                        'La fecha de devolución no puede ser anterior a la fecha de préstamo.',
-                    );
-                }
-            }
-
-            // Prepare update data
-            const data: Prisma.PrestamoUpdateInput = {
-                estadoPrestamo: nextEstado,
-                fechaDevolucion: updatePrestamoDto.fechaDevolucion
-                    ? new Date(updatePrestamoDto.fechaDevolucion)
-                    : (nextEstado === EstadoPrestamo.DEVUELTO ? new Date() : undefined),
-            };
-
-            // Handle Side Effects on Stock and Student if status changes
-            if (nextEstado && nextEstado !== prevEstado) {
-                const ejemplar = await tx.ejemplar.findUnique({
-                    where: { ejemplarId: prestamo.ejemplarId },
+        try {
+            return await this.prisma.$transaction(async (tx) => {
+                const prestamo = await tx.prestamo.findUnique({
+                    where: { prestamoId: id },
                 });
 
-                if (!ejemplar) throw new NotFoundException('Ejemplar no encontrado');
+                if (!prestamo) {
+                    throw new NotFoundException(`Prestamo con ID ${id} no encontrado`);
+                }
 
-                // Transitions FROM ACTIVO
-                if (prevEstado === EstadoPrestamo.ACTIVO) {
+                const prevEstado = prestamo.estadoPrestamo;
+                let nextEstado = updatePrestamoDto.estadoPrestamo;
+
+                // Date validation and Auto-Status
+                if (updatePrestamoDto.fechaLimite) {
+                    const newFechaLim = new Date(updatePrestamoDto.fechaLimite);
+                    if (newFechaLim < prestamo.fechaPrestamo) {
+                        throw new BadRequestException('La fecha límite no puede ser anterior a la fecha de préstamo.');
+                    }
+                }
+
+                if (updatePrestamoDto.fechaDevolucion) {
+                    const newFechaDev = new Date(updatePrestamoDto.fechaDevolucion);
+                    if (newFechaDev < prestamo.fechaPrestamo) {
+                        throw new BadRequestException('La fecha de devolución no puede ser anterior a la fecha de préstamo.');
+                    }
+                    // If return date is provided, status implies DEVUELTO
+                    nextEstado = EstadoPrestamo.DEVUELTO;
+                }
+
+                // If explicitly setting to DEVUELTO without date, use NOW
+                const fechaDevolucion = updatePrestamoDto.fechaDevolucion
+                    ? new Date(updatePrestamoDto.fechaDevolucion)
+                    : (nextEstado === EstadoPrestamo.DEVUELTO ? new Date() : undefined);
+
+                const data: Prisma.PrestamoUpdateInput = {
+                    ...updatePrestamoDto,
+                    estadoPrestamo: nextEstado, // Priority to calculated state
+                    fechaDevolucion: fechaDevolucion,
+                };
+
+                // Status Transitions
+                if (nextEstado && nextEstado !== prevEstado) {
+                    const ejemplar = await tx.ejemplar.findUnique({
+                        where: { ejemplarId: prestamo.ejemplarId },
+                    });
+
+                    if (!ejemplar) throw new NotFoundException('Ejemplar no encontrado');
+
+                    // Handle Return (from ACTIVO or PERDIDO)
                     if (nextEstado === EstadoPrestamo.DEVUELTO) {
-                        // RETURNED: Increment stock
-                        const newDisponible = ejemplar.cantidadDisponible + 1;
+                        // Mark Unit as DISPONIBLE
                         await tx.ejemplar.update({
                             where: { ejemplarId: ejemplar.ejemplarId },
-                            data: {
-                                cantidadDisponible: newDisponible,
-                                estado: EstadoEjemplar.DISPONIBLE,
-                            },
+                            data: { estado: EstadoEjemplar.DISPONIBLE },
                         });
 
-                        // Check for Late Return (Sanción persistente)
+                        // Check Late Return
                         const fechaRetorno = (data.fechaDevolucion as Date) || new Date();
-
                         if (prestamo.fechaLimite && fechaRetorno > prestamo.fechaLimite) {
-                            // Increment persistent sanctions
-                            const estudianteUpdated = await tx.estudiante.update({
+                            const est = await tx.estudiante.update({
                                 where: { estudianteId: prestamo.estudianteId },
                                 data: { sanciones: { increment: 1 } },
                             });
-
-                            // Apply penalty threshold
-                            if (estudianteUpdated.sanciones >= 3) {
-                                await tx.estudiante.update({
-                                    where: { estudianteId: prestamo.estudianteId },
-                                    data: { activo: false },
-                                });
-                            }
+                            // If previously deactivated due to PERDIDO or Sanctions, we might want to check 
+                            // if they can be reactivated, but business logic is complex there. 
+                            // For now, we simply record the sanction increment.
                         }
-                    } else if (nextEstado === EstadoPrestamo.PERDIDO) {
-                        // LOST: Decrement total quantity, de-activate student
+                    }
+                    // FROM ACTIVO to PERDIDO
+                    else if (prevEstado === EstadoPrestamo.ACTIVO && nextEstado === EstadoPrestamo.PERDIDO) {
+                        // Mark Unit as PERDIDO
                         await tx.ejemplar.update({
                             where: { ejemplarId: ejemplar.ejemplarId },
-                            data: {
-                                cantidadTotal: { decrement: 1 },
-                                // If disponible was 0, it might still be 0, but total is less.
-                                // If it was already lent, disponible stays same.
-                            },
+                            data: { estado: EstadoEjemplar.PERDIDO },
                         });
-
                         await tx.estudiante.update({
                             where: { estudianteId: prestamo.estudianteId },
                             data: { activo: false },
                         });
                     }
-                }
+                    // TO ACTIVO (Undo)
+                    else if (nextEstado === EstadoPrestamo.ACTIVO) {
+                        if (ejemplar.estado === EstadoEjemplar.PRESTADO) {
+                            throw new ConflictException('El ejemplar ya está prestado (posiblemente a otro usuario).');
+                        }
 
-                // Transitions TO ACTIVO (e.g. correcting a mistake)
-                else if (nextEstado === EstadoPrestamo.ACTIVO) {
-                    if (ejemplar.cantidadDisponible <= 0) {
-                        throw new ConflictException('No hay ejemplares disponibles para reactivar este préstamo.');
-                    }
-                    const newDisponible = ejemplar.cantidadDisponible - 1;
-                    await tx.ejemplar.update({
-                        where: { ejemplarId: ejemplar.ejemplarId },
-                        data: {
-                            cantidadDisponible: newDisponible,
-                            estado: newDisponible === 0 ? EstadoEjemplar.NO_DISPONIBLE : EstadoEjemplar.DISPONIBLE,
-                        },
-                    });
-
-                    // If it was lost, we might need to restore total count? 
-                    // Usually mistakes are better handled by deleting and re-creating, 
-                    // but let's handle the total count restore if it was PERDIDO
-                    if (prevEstado === EstadoPrestamo.PERDIDO) {
                         await tx.ejemplar.update({
                             where: { ejemplarId: ejemplar.ejemplarId },
-                            data: { cantidadTotal: { increment: 1 } },
+                            data: { estado: EstadoEjemplar.PRESTADO },
                         });
-                        // Note: Not auto-activating student because we don't know why they were deactivated.
                     }
                 }
-            }
 
-            return tx.prestamo.update({
-                where: { prestamoId: id },
-                data,
+                return await tx.prestamo.update({
+                    where: { prestamoId: id },
+                    data,
+                    include: {
+                        estudiante: true,
+                        bibliotecario: true,
+                        ejemplar: {
+                            include: {
+                                libro: {
+                                    include: {
+                                        categoria: true,
+                                        editorial: true,
+                                        autores: { include: { autor: true } }
+                                    }
+                                },
+                            },
+                        },
+                    },
+                });
             });
-        });
+        } catch (error) {
+            this.handlePrismaError(error);
+        }
     }
 
     remove(id: number) {
-        throw new BadRequestException('No se permite eliminar préstamos. Use los cambios de estado (DEVUELTO/PERDIDO) para mantener la trazabilidad.');
+        throw new BadRequestException('No se permite eliminar préstamos físicamente. Use el cambio de estado.');
+    }
+
+    private handlePrismaError(error: any) {
+        if (error instanceof NotFoundException || error instanceof ConflictException || error instanceof BadRequestException) {
+            throw error;
+        }
+        if (error.code === 'P2002') {
+            throw new ConflictException(`Conflicto de unicidad en el campo: ${error.meta?.target?.join(', ')}`);
+        }
+        if (error.code === 'P2003') {
+            throw new BadRequestException(`Error de relación. Algún ID proporcionado no existe en el sistema.`);
+        }
+        if (error.code === 'P2025') {
+            throw new NotFoundException(`No se encontró el registro solicitado.`);
+        }
+        throw error;
     }
 }
-

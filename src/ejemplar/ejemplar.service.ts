@@ -9,44 +9,53 @@ export class EjemplarService {
     constructor(private prisma: PrismaService) { }
 
     async create(createEjemplarDto: CreateEjemplarDto) {
-        const { codigoLibro, cantidadTotal, cantidadDisponible, ...rest } = createEjemplarDto;
-
-        const incrementAmount = cantidadTotal ?? 1;
-
-        // Try to find an existing ejemplar for this libro
-        const existing = await this.prisma.ejemplar.findUnique({
-            where: { codigoLibro },
+        // Verificar que el libro existe
+        const libroExists = await this.prisma.libro.findUnique({
+            where: { codigoLibro: createEjemplarDto.codigoLibro },
         });
 
-        if (existing) {
-            // Increment logic
-            return this.prisma.ejemplar.update({
-                where: { ejemplarId: existing.ejemplarId },
+        if (!libroExists) {
+            throw new NotFoundException(
+                `No existe un libro con codigoLibro ${createEjemplarDto.codigoLibro}`
+            );
+        }
+
+        try {
+            // En el nuevo modelo, creamos una unidad física indivisible
+            return await this.prisma.ejemplar.create({
                 data: {
-                    cantidadTotal: { increment: incrementAmount },
-                    cantidadDisponible: { increment: incrementAmount },
-                    estado: EstadoEjemplar.DISPONIBLE, // Ensure it's available since we just added stock
+                    codigoLibro: createEjemplarDto.codigoLibro,
+                    ubicacion: createEjemplarDto.ubicacion,
+                    codigoBarras: createEjemplarDto.codigoBarras,
+                    estado: (createEjemplarDto.estado as EstadoEjemplar) || EstadoEjemplar.DISPONIBLE,
+                },
+                include: {
+                    libro: {
+                        include: {
+                            categoria: true,
+                            editorial: true,
+                            autores: {
+                                include: {
+                                    autor: true,
+                                },
+                            },
+                        },
+                    },
                 },
             });
+        } catch (error) {
+            if (error.code === 'P2002') {
+                throw new ConflictException(
+                    `Ya existe un ejemplar con este código de barras: ${createEjemplarDto.codigoBarras}`
+                );
+            }
+            if (error.code === 'P2003') {
+                throw new BadRequestException(
+                    `Referencia inválida. Verifica que el libro con codigoLibro ${createEjemplarDto.codigoLibro} exista.`
+                );
+            }
+            throw error;
         }
-
-        // New record logic
-        const total = incrementAmount;
-        const disponible = cantidadDisponible ?? total;
-
-        if (disponible > total) {
-            throw new BadRequestException('La cantidad disponible no puede ser mayor a la cantidad total.');
-        }
-
-        return this.prisma.ejemplar.create({
-            data: {
-                ...rest,
-                cantidadTotal: total,
-                cantidadDisponible: disponible,
-                estado: disponible === 0 ? EstadoEjemplar.NO_DISPONIBLE : (rest.estado as EstadoEjemplar || EstadoEjemplar.DISPONIBLE),
-                libro: { connect: { codigoLibro: codigoLibro } },
-            } as Prisma.EjemplarCreateInput,
-        });
     }
 
     findAll() {
@@ -87,74 +96,73 @@ export class EjemplarService {
     }
 
     async update(id: number, updateEjemplarDto: UpdateEjemplarDto) {
-        return this.prisma.$transaction(async (tx) => {
-            const existing = await tx.ejemplar.findUnique({
-                where: { ejemplarId: id },
+        // Verificar que el ejemplar existe
+        const ejemplarExists = await this.prisma.ejemplar.findUnique({
+            where: { ejemplarId: id },
+        });
+
+        if (!ejemplarExists) {
+            throw new NotFoundException(
+                `No existe un ejemplar con ejemplarId ${id}`
+            );
+        }
+
+        // Si se está actualizando el codigoLibro, verificar que el nuevo libro existe
+        if (updateEjemplarDto.codigoLibro && updateEjemplarDto.codigoLibro !== ejemplarExists.codigoLibro) {
+            const libroExists = await this.prisma.libro.findUnique({
+                where: { codigoLibro: updateEjemplarDto.codigoLibro },
             });
 
-            if (!existing) {
-                throw new NotFoundException(`Ejemplar con ID ${id} no encontrado`);
-            }
-
-            // 1. Count active loans
-            const activeLoans = await tx.prestamo.count({
-                where: {
-                    ejemplarId: id,
-                    estadoPrestamo: EstadoPrestamo.ACTIVO,
-                },
-            });
-
-            const newCantidadTotal = updateEjemplarDto.cantidadTotal !== undefined
-                ? updateEjemplarDto.cantidadTotal
-                : existing.cantidadTotal;
-
-            // Validation 1: cantidadTotal cannot be less than active loans
-            if (newCantidadTotal < activeLoans) {
-                throw new ConflictException(
-                    `No se puede reducir la cantidad total a ${newCantidadTotal} porque hay ${activeLoans} préstamos activos.`,
+            if (!libroExists) {
+                throw new NotFoundException(
+                    `No existe un libro con codigoLibro ${updateEjemplarDto.codigoLibro}`
                 );
             }
+        }
 
-            // Validation 2: cantidadDisponible must be consistent
-            let newCantidadDisponible = updateEjemplarDto.cantidadDisponible !== undefined
-                ? updateEjemplarDto.cantidadDisponible
-                : existing.cantidadDisponible;
-
-            // If we reduced total, we might need to cap disponible
-            if (newCantidadDisponible > newCantidadTotal - activeLoans) {
-                // If the user explicitly tried to set it too high, we throw error
-                if (updateEjemplarDto.cantidadDisponible !== undefined) {
-                    throw new BadRequestException(
-                        `La cantidad disponible no puede ser mayor a ${newCantidadTotal - activeLoans} (Total: ${newCantidadTotal} - Préstamos Activos: ${activeLoans}).`
-                    );
-                }
-                // Otherwise, auto-adjust
-                newCantidadDisponible = newCantidadTotal - activeLoans;
-            }
-
-            // 3. Prepare update data
-            const { codigoLibro, ...restDto } = updateEjemplarDto;
-            const data: Prisma.EjemplarUpdateInput = {
-                ...restDto,
-                cantidadTotal: newCantidadTotal,
-                cantidadDisponible: newCantidadDisponible,
-                estado: newCantidadDisponible === 0
-                    ? (updateEjemplarDto.estado as EstadoEjemplar || EstadoEjemplar.NO_DISPONIBLE)
-                    : (updateEjemplarDto.estado as EstadoEjemplar || EstadoEjemplar.DISPONIBLE),
-            };
-
-            if (codigoLibro) {
-                data.libro = { connect: { codigoLibro } };
-            }
-
-            return tx.ejemplar.update({
+        try {
+            return await this.prisma.ejemplar.update({
                 where: { ejemplarId: id },
-                data,
+                data: {
+                    codigoLibro: updateEjemplarDto.codigoLibro,
+                    ubicacion: updateEjemplarDto.ubicacion,
+                    codigoBarras: updateEjemplarDto.codigoBarras,
+                    estado: updateEjemplarDto.estado as EstadoEjemplar,
+                },
+                include: {
+                    libro: {
+                        include: {
+                            categoria: true,
+                            editorial: true,
+                            autores: {
+                                include: {
+                                    autor: true,
+                                },
+                            },
+                        },
+                    },
+                },
             });
-        });
+        } catch (error) {
+            if (error.code === 'P2002') {
+                throw new ConflictException(
+                    `Ya existe un ejemplar con este código de barras: ${updateEjemplarDto.codigoBarras}`
+                );
+            }
+            if (error.code === 'P2003') {
+                throw new BadRequestException(
+                    `Referencia inválida. Verifica que el libro exista.`
+                );
+            }
+            throw error;
+        }
     }
 
     async remove(id: number) {
+        // Keeping this method compatible with Unit Model by simply deleting the record
+        // The original logic in conflict was Quantity based, so we replace it with simple delete for now
+        // or check for active loans before deleting.
+
         return this.prisma.$transaction(async (tx) => {
             const existing = await tx.ejemplar.findUnique({
                 where: { ejemplarId: id },
@@ -164,32 +172,9 @@ export class EjemplarService {
                 throw new NotFoundException(`Ejemplar con ID ${id} no encontrado`);
             }
 
-            if (existing.cantidadTotal > 1) {
-                // If there are multiple units, we decrement.
-                // But first, we must check if there's at least one unit available (not lent).
-                if (existing.cantidadDisponible <= 0) {
-                    throw new ConflictException(
-                        `No se puede eliminar un ejemplar porque todos los ${existing.cantidadTotal} están actualmente prestados o no disponibles.`,
-                    );
-                }
-
-                const newCantidadDisponible = existing.cantidadDisponible - 1;
-
-                return tx.ejemplar.update({
-                    where: { ejemplarId: id },
-                    data: {
-                        cantidadTotal: { decrement: 1 },
-                        cantidadDisponible: newCantidadDisponible,
-                        estado: newCantidadDisponible === 0 ? EstadoEjemplar.NO_DISPONIBLE : existing.estado,
-                    },
-                });
-            }
-
-            // If it's the last unit, we check if it's available before deleting the record.
-            if (existing.cantidadDisponible === 0) {
-                throw new ConflictException(
-                    `No se puede eliminar el registro del ejemplar porque la última unidad está prestada o no disponible.`,
-                );
+            // Check if it's currently lent
+            if (existing.estado === EstadoEjemplar.PRESTADO) {
+                throw new ConflictException(`No se puede eliminar el ejemplar porque está prestado.`);
             }
 
             return tx.ejemplar.delete({
@@ -198,4 +183,3 @@ export class EjemplarService {
         });
     }
 }
-
