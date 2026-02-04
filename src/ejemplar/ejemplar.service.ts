@@ -3,6 +3,7 @@ import { Prisma, EstadoEjemplar, EstadoPrestamo } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEjemplarDto } from './dto/create-ejemplar.dto';
 import { UpdateEjemplarDto } from './dto/update-ejemplar.dto';
+import { UpdateQuantityDto } from './dto/update-quantity.dto';
 
 @Injectable()
 export class EjemplarService {
@@ -180,6 +181,99 @@ export class EjemplarService {
             return tx.ejemplar.delete({
                 where: { ejemplarId: id },
             });
+        });
+    }
+
+    async updateQuantity(libroId: number, updateQuantityDto: UpdateQuantityDto) {
+        const { cantidad: nuevaCantidad, ubicacion } = updateQuantityDto;
+
+        const libroExists = await this.prisma.libro.findUnique({
+            where: { codigoLibro: libroId },
+        });
+
+        if (!libroExists) {
+            throw new NotFoundException(`No existe un libro con codigoLibro ${libroId}`);
+        }
+
+        // Obtener todos los ejemplares actuales
+        const ejemplares = await this.prisma.ejemplar.findMany({
+            where: { codigoLibro: libroId },
+        });
+
+        const cantidadActual = ejemplares.length;
+
+        if (nuevaCantidad === cantidadActual) {
+            return { message: 'La cantidad es la misma, no se realizaron cambios.', currentCount: cantidadActual };
+        }
+
+        if (nuevaCantidad > cantidadActual) {
+            // INCREMENTO
+            const cantidadAcrear = nuevaCantidad - cantidadActual;
+            const now = Date.now();
+
+            const createPromises = Array.from({ length: cantidadAcrear }).map((_, index) => {
+                return this.prisma.ejemplar.create({
+                    data: {
+                        codigoLibro: libroId,
+                        ubicacion: ubicacion || 'Biblioteca Central',
+                        estado: EstadoEjemplar.DISPONIBLE,
+                        codigoBarras: `LIB-${libroId}-${now}-${index}`, // Autogenerado Option B
+                    }
+                });
+            });
+
+            await this.prisma.$transaction([
+                ...createPromises,
+                this.prisma.historialStock.create({
+                    data: {
+                        libroId,
+                        cantidadAnterior: cantidadActual,
+                        cantidadNueva: nuevaCantidad,
+                        tipoMovimiento: 'INCREMENTO',
+                        usuario: 'Sistema' // TODO: Pass user context if available
+                    }
+                })
+            ]);
+
+        } else {
+            // DECREMENTO
+            const cantidadAEliminar = cantidadActual - nuevaCantidad;
+
+            // Filtramos solo los disponibles
+            const disponibles = ejemplares.filter(e => e.estado === EstadoEjemplar.DISPONIBLE);
+
+            if (disponibles.length < cantidadAEliminar) {
+                throw new BadRequestException(
+                    `No se puede reducir la cantidad a ${nuevaCantidad}. Solo hay ${disponibles.length} ejemplares DISPONIBLES para eliminar, pero se requiere eliminar ${cantidadAEliminar}. Existen ejemplares PRESTADOS, PERDIDOS o en REPARACION.`
+                );
+            }
+
+            // Tomamos los IDs a eliminar (los últimos creados o arbitrarios)
+            const idsAEliminar = disponibles.slice(0, cantidadAEliminar).map(e => e.ejemplarId);
+
+            await this.prisma.$transaction([
+                this.prisma.ejemplar.deleteMany({
+                    where: { ejemplarId: { in: idsAEliminar } }
+                }),
+                this.prisma.historialStock.create({
+                    data: {
+                        libroId,
+                        cantidadAnterior: cantidadActual,
+                        cantidadNueva: nuevaCantidad,
+                        tipoMovimiento: 'DECREMENTO',
+                        usuario: 'Sistema'
+                    }
+                })
+            ]);
+        }
+
+        return { message: 'Stock actualizado correctamente', previousCount: cantidadActual, newCount: nuevaCantidad };
+    }
+
+    async getHistory(libroId: number) {
+        return this.prisma.historialStock.findMany({
+            where: { libroId },
+            orderBy: { fecha: 'desc' }
         });
     }
 }
