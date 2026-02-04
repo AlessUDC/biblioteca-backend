@@ -93,6 +93,19 @@ model Libro {
   editoriales Editorial[]
   autores     LibroAutor[]
   ejemplares  Ejemplar[]
+  historialStock HistorialStock[]
+}
+
+model HistorialStock {
+  historialId      Int      @id @default(autoincrement())
+  libroId          Int
+  cantidadAnterior Int
+  cantidadNueva    Int
+  tipoMovimiento   String
+  fecha            DateTime @default(now())
+  usuario          String?
+
+  libro            Libro    @relation(fields: [libroId], references: [codigoLibro])
 }
 
 model LibroAutor {
