@@ -60,6 +60,7 @@ export class LibroService {
                         autor: true,
                     },
                 },
+                ejemplares: true,
             },
         });
     }
@@ -75,6 +76,7 @@ export class LibroService {
                         autor: true,
                     },
                 },
+                ejemplares: true,
             },
         });
     }
@@ -123,10 +125,30 @@ export class LibroService {
     }
 
     async remove(id: number) {
+        // 1. Check if there are any active or lost loans associated with this book's copies
+        const activeLoan = await this.prisma.prestamo.findFirst({
+            where: {
+                ejemplar: { codigoLibro: id },
+                estadoPrestamo: { in: ['ACTIVO', 'PERDIDO'] }
+            }
+        });
+
+        if (activeLoan) {
+            throw new BadRequestException('Error al eliminar el libro. Asegúrese de que no tenga ejemplares prestados.');
+        }
+
+        // 2. Delete all exemplars (copies) of this book
+        // We can safely delete them since we checked for active loans
+        await this.prisma.ejemplar.deleteMany({
+            where: { codigoLibro: id }
+        });
+
+        // 3. Delete author relations
         await this.prisma.libroAutor.deleteMany({
             where: { libroId: id },
         });
-        // We might also want to disconnect categories/editorials but cascade/implicit handles it usually or it's just a relation
+
+        // 4. Delete the book
         return this.prisma.libro.delete({
             where: { codigoLibro: id },
         });

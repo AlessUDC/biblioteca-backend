@@ -24,9 +24,24 @@ export class EstudianteService {
         }
     }
 
-    findAll() {
+    findAll(onlyActive: boolean = true) {
         return this.prisma.estudiante.findMany({
-            where: { activo: true },
+            where: onlyActive ? { activo: true } : {},
+            include: {
+                escuela: {
+                    include: { facultad: true }
+                },
+            },
+            orderBy: { nombre: 'asc' }
+        });
+    }
+
+    async findByDocument(type: string, number: string) {
+        return this.prisma.estudiante.findFirst({
+            where: {
+                tipoDocumento: type,
+                numeroDocumento: number,
+            },
             include: {
                 escuela: {
                     include: { facultad: true }
@@ -86,6 +101,30 @@ export class EstudianteService {
         return this.prisma.estudiante.update({
             where: { estudianteId: id },
             data: { activo: false },
+        });
+    }
+
+    async sancionar(id: number) {
+        const estudiante = await this.findOne(id);
+        const nuevasSanciones = estudiante.sanciones + 1;
+        return this.prisma.estudiante.update({
+            where: { estudianteId: id },
+            data: {
+                sanciones: nuevasSanciones,
+                activo: nuevasSanciones < 3,
+            },
+        });
+    }
+
+    async quitarSancion(id: number) {
+        const estudiante = await this.findOne(id);
+        const nuevasSanciones = Math.max(0, estudiante.sanciones - 1);
+        return this.prisma.estudiante.update({
+            where: { estudianteId: id },
+            data: {
+                sanciones: nuevasSanciones,
+                activo: nuevasSanciones < 3,
+            },
         });
     }
 

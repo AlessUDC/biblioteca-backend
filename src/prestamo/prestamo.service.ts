@@ -147,6 +147,28 @@ export class PrestamoService {
         });
     }
 
+    findByStudent(estudianteId: number) {
+        return this.prisma.prestamo.findMany({
+            where: { estudianteId },
+            include: {
+                estudiante: true,
+                bibliotecario: true,
+                ejemplar: {
+                    include: {
+                        libro: {
+                            include: {
+                                categorias: true,
+                                editoriales: true,
+                                autores: { include: { autor: true } }
+                            }
+                        },
+                    },
+                },
+            },
+            orderBy: { fechaPrestamo: 'desc' }
+        });
+    }
+
     async findOne(id: number) {
         const prestamo = await this.prisma.prestamo.findUnique({
             where: { prestamoId: id },

@@ -12,6 +12,11 @@ export class PrestamoController {
         return this.prestamoService.create(createPrestamoDto);
     }
 
+    @Get('estudiante/:id')
+    findByStudent(@Param('id') id: string) {
+        return this.prestamoService.findByStudent(+id);
+    }
+
     @Get()
     findAll() {
         return this.prestamoService.findAll();

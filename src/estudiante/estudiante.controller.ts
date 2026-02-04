@@ -17,6 +17,11 @@ export class EstudianteController {
         return this.estudianteService.findAll();
     }
 
+    @Get('buscar/:tipo/:numero')
+    findByDocument(@Param('tipo') tipo: string, @Param('numero') numero: string) {
+        return this.estudianteService.findByDocument(tipo, numero);
+    }
+
     @Get(':id')
     findOne(@Param('id') id: string) {
         return this.estudianteService.findOne(+id);
@@ -30,5 +35,15 @@ export class EstudianteController {
     @Delete(':id')
     remove(@Param('id') id: string) {
         return this.estudianteService.remove(+id);
+    }
+
+    @Patch(':id/sancionar')
+    sancionar(@Param('id') id: string) {
+        return this.estudianteService.sancionar(+id);
+    }
+
+    @Patch(':id/quitar-sancion')
+    quitarSancion(@Param('id') id: string) {
+        return this.estudianteService.quitarSancion(+id);
     }
 }
